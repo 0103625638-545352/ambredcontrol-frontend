@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* Por defecto, Tailwind v4 activa "dark:" según la preferencia del sistema
+   operativo (prefers-color-scheme). Con esta línea lo cambiamos a activarse
+   por una clase ".dark" en <html> — así el usuario puede alternarlo con un
+   botón, sin depender de la configuración de su sistema. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Transición suave de colores al alternar el tema, para que no se sienta
+   como un parpadeo brusco. */
+* {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Color de texto base para TODO el documento. Muchas celdas de tabla y
+   textos en la app no fijan un color explícito (heredan el negro por
+   defecto) — sin esto, se verían ilegibles sobre el fondo oscuro de las
+   tarjetas. Cualquier elemento que sí fije su propio color (text-gray-500,
+   etc.) sigue ganando, como siempre en CSS. */
+body {
+  @apply text-gray-900 dark:text-gray-100;
+}
+
+/* Paleta para gráficos (ver ReportesPage.tsx): una sola variable por rol,
+   con su versión clara y oscura, para que los charts (Recharts no entiende
+   las clases "dark:" de Tailwind) cambien solos cuando se alterna el tema. */
+:root {
+  --chart-series-1: #2a78d6;
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+  --chart-muted: #898781;
+  --chart-tooltip-bg: #fcfcfb;
+  --chart-tooltip-border: rgba(11, 11, 11, 0.1);
+  --chart-tooltip-text: #0b0b0b;
+}
+.dark {
+  --chart-series-1: #3987e5;
+  --chart-grid: #2c2c2a;
+  --chart-axis: #383835;
+  --chart-muted: #898781;
+  --chart-tooltip-bg: #1a1a19;
+  --chart-tooltip-border: rgba(255, 255, 255, 0.1);
+  --chart-tooltip-text: #ffffff;
+}

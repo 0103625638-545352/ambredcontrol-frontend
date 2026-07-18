@@ -1,0 +1,677 @@
+import { useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, URL_BASE_API, type Sucursal } from "../api/client";
+import { useToast } from "../components/ToastProvider";
+import { useConfirm } from "../components/ConfirmProvider";
+import { MapaGeocerca } from "../components/MapaGeocerca";
+import { DiccionarioBuscador } from "../components/DiccionarioBuscador";
+
+interface RespuestaLogo {
+  logoUrl: string | null;
+}
+
+interface DatosEmpresa {
+  nombre: string;
+  ruc: string;
+  razonSocial: string;
+  direccionMatriz: string;
+  ambienteSri: "1" | "2";
+  establecimiento: string;
+  puntoEmision: string;
+  obligadoContabilidad: boolean;
+  emailResumenDestinatario: string;
+  agenteRetencion: boolean;
+  diaInicioCorte: number;
+  diaFinCorte: number;
+  tieneCertificado: boolean;
+}
+
+interface RespuestaBackupComprobantes {
+  configurado: boolean;
+  carpetaBackup: string | null;
+  totalPrincipal: number;
+  totalBackup: number;
+}
+
+interface RespuestaBackupDb {
+  configurado: boolean;
+  ultimoExitoso: string | null;
+  ultimoError: string | null;
+  ultimoIntento: string | null;
+  archivo: string | null;
+  atrasado: boolean;
+}
+
+// El logo se sube tal cual se ve en el RIDE (PDF de factura/nota de crédito)
+// — no hay vista previa "simulada", la imagen mostrada acá ES el archivo que
+// generarRide.ts va a incrustar arriba a la izquierda del PDF.
+export function AjustesPage() {
+  const queryClient = useQueryClient();
+  const { mostrarToast } = useToast();
+  const confirmar = useConfirm();
+  const [archivo, setArchivo] = useState<File | null>(null);
+
+  // --- Datos de la empresa (RUC, ambiente SRI, etc.) ---
+  const { data: empresa, isLoading: cargandoEmpresa } = useQuery({
+    queryKey: ["configuracion-empresa"],
+    queryFn: async () => (await api.get<DatosEmpresa>("/configuracion/empresa")).data,
+  });
+
+  const [formEmpresa, setFormEmpresa] = useState<Omit<DatosEmpresa, "tieneCertificado"> | null>(null);
+
+  // El formulario se llena una vez que llega la respuesta del servidor — así
+  // el usuario nunca ve campos vacíos "parpadear" antes de tener los datos reales.
+  useEffect(() => {
+    if (empresa) {
+      const { tieneCertificado: _tieneCertificado, ...editable } = empresa;
+      setFormEmpresa(editable);
+    }
+  }, [empresa]);
+
+  const guardarEmpresa = useMutation({
+    mutationFn: async () => (await api.put<DatosEmpresa>("/configuracion/empresa", formEmpresa)).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["configuracion-empresa"] });
+      mostrarToast("Datos de la empresa actualizados", "success");
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al guardar los datos de la empresa");
+    },
+  });
+
+  async function confirmarGuardarEmpresa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formEmpresa) return;
+    if (formEmpresa.ambienteSri === "2" && empresa?.ambienteSri !== "2") {
+      const ok = await confirmar(
+        "Vas a pasar esta empresa a ambiente de PRODUCCIÓN: de ahora en adelante, cada factura y nota de " +
+          "crédito que envíes va en serio al SRI. Necesitas un certificado de firma real (no el de pruebas) " +
+          "para poder enviarlas. ¿Continuar?"
+      );
+      if (!ok) return;
+    }
+    guardarEmpresa.mutate();
+  }
+
+  // --- Certificado de firma electrónica (.p12) ---
+  const [archivoCertificado, setArchivoCertificado] = useState<File | null>(null);
+  const [passwordCertificado, setPasswordCertificado] = useState("");
+
+  const subirCertificado = useMutation({
+    mutationFn: async () => {
+      const datosFormulario = new FormData();
+      datosFormulario.append("certificado", archivoCertificado!);
+      datosFormulario.append("password", passwordCertificado);
+      return api.post("/configuracion/certificado", datosFormulario);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["configuracion-empresa"] });
+      setArchivoCertificado(null);
+      setPasswordCertificado("");
+      mostrarToast("Certificado actualizado", "success");
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al subir el certificado");
+    },
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["configuracion-logo"],
+    queryFn: async () => (await api.get<RespuestaLogo>("/configuracion/logo")).data,
+  });
+
+  const subirLogo = useMutation({
+    mutationFn: async () => {
+      const datosFormulario = new FormData();
+      datosFormulario.append("logo", archivo!);
+      return api.post<RespuestaLogo>("/configuracion/logo", datosFormulario);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["configuracion-logo"] });
+      setArchivo(null);
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al subir el logo");
+    },
+  });
+
+  const quitarLogo = useMutation({
+    mutationFn: async () => api.delete("/configuracion/logo"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["configuracion-logo"] });
+    },
+  });
+
+  async function confirmarQuitar() {
+    const ok = await confirmar("¿Quitar el logo? Las próximas facturas y notas de crédito se generarán sin logo.");
+    if (ok) quitarLogo.mutate();
+  }
+
+  const { data: backup, isLoading: cargandoBackup } = useQuery({
+    queryKey: ["backup-comprobantes"],
+    queryFn: async () => (await api.get<RespuestaBackupComprobantes>("/configuracion/backup-comprobantes")).data,
+  });
+
+  const ejecutarBackup = useMutation({
+    mutationFn: async () => (await api.post("/configuracion/backup-comprobantes/ejecutar")).data as { mensaje: string },
+    onSuccess: (respuesta) => {
+      queryClient.invalidateQueries({ queryKey: ["backup-comprobantes"] });
+      mostrarToast(respuesta.mensaje, "success");
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al ejecutar el respaldo");
+    },
+  });
+
+  // --- Respaldo automático de base de datos ---
+  const { data: backupDb, isLoading: cargandoBackupDb } = useQuery({
+    queryKey: ["backup-db"],
+    queryFn: async () => (await api.get<RespuestaBackupDb>("/configuracion/backup-db")).data,
+  });
+
+  const ejecutarBackupDb = useMutation({
+    mutationFn: async () => (await api.post("/configuracion/backup-db/ejecutar")).data as { mensaje: string },
+    onSuccess: (respuesta) => {
+      queryClient.invalidateQueries({ queryKey: ["backup-db"] });
+      mostrarToast(respuesta.mensaje, "success");
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al ejecutar el respaldo");
+    },
+  });
+
+  // --- Geocercas de sucursales (marcaciones de asistencia) ---
+  const { data: sucursales, isLoading: cargandoSucursales } = useQuery({
+    queryKey: ["sucursales"],
+    queryFn: async () => (await api.get<Sucursal[]>("/sucursales")).data,
+  });
+
+  const [geocercaForms, setGeocercaForms] = useState<Record<number, { latitud: string; longitud: string; radioGeocercaMetros: string }>>({});
+
+  useEffect(() => {
+    if (!sucursales) return;
+    setGeocercaForms((actual) => {
+      const nuevo = { ...actual };
+      for (const s of sucursales) {
+        if (!nuevo[s.id]) {
+          nuevo[s.id] = {
+            latitud: s.latitud ?? "",
+            longitud: s.longitud ?? "",
+            radioGeocercaMetros: s.radioGeocercaMetros != null ? String(s.radioGeocercaMetros) : "",
+          };
+        }
+      }
+      return nuevo;
+    });
+  }, [sucursales]);
+
+  const guardarGeocerca = useMutation({
+    mutationFn: async (sucursalId: number) => {
+      const form = geocercaForms[sucursalId];
+      return api.patch(`/sucursales/${sucursalId}/geocerca`, {
+        latitud: form.latitud ? Number(form.latitud) : null,
+        longitud: form.longitud ? Number(form.longitud) : null,
+        radioGeocercaMetros: form.radioGeocercaMetros ? Number(form.radioGeocercaMetros) : null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sucursales"] });
+      mostrarToast("Geocerca actualizada", "success");
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al guardar la geocerca");
+    },
+  });
+
+  function usarUbicacionActual(sucursalId: number) {
+    if (!("geolocation" in navigator)) {
+      mostrarToast("Este navegador no puede obtener tu ubicación");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (posicion) => {
+        setGeocercaForms((actual) => ({
+          ...actual,
+          [sucursalId]: {
+            ...actual[sucursalId],
+            latitud: String(posicion.coords.latitude),
+            longitud: String(posicion.coords.longitude),
+          },
+        }));
+      },
+      () => mostrarToast("No se pudo obtener tu ubicación — revisa el permiso de ubicación del navegador"),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Ajustes</h2>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Datos de la empresa</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          RUC, razón social y ambiente SRI usados al firmar y enviar facturas y notas de crédito.
+        </p>
+
+        {cargandoEmpresa || !formEmpresa ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        ) : (
+          <form onSubmit={confirmarGuardarEmpresa} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Nombre</label>
+              <input
+                type="text"
+                value={formEmpresa.nombre}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, nombre: e.target.value })}
+                required
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">RUC</label>
+              <input
+                type="text"
+                value={formEmpresa.ruc}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, ruc: e.target.value })}
+                required
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Razón social</label>
+              <input
+                type="text"
+                value={formEmpresa.razonSocial}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, razonSocial: e.target.value })}
+                required
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Dirección matriz</label>
+              <input
+                type="text"
+                value={formEmpresa.direccionMatriz}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, direccionMatriz: e.target.value })}
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Establecimiento</label>
+                <input
+                  type="text"
+                  value={formEmpresa.establecimiento}
+                  onChange={(e) => setFormEmpresa({ ...formEmpresa, establecimiento: e.target.value })}
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Punto de emisión</label>
+                <input
+                  type="text"
+                  value={formEmpresa.puntoEmision}
+                  onChange={(e) => setFormEmpresa({ ...formEmpresa, puntoEmision: e.target.value })}
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Ambiente SRI</label>
+              <select
+                value={formEmpresa.ambienteSri}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, ambienteSri: e.target.value as "1" | "2" })}
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+              >
+                <option value="1">Ambiente: Pruebas</option>
+                <option value="2">Ambiente: Producción</option>
+              </select>
+              {formEmpresa.ambienteSri === "2" && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  En producción, cada comprobante enviado va en serio al SRI. Verifica que el certificado
+                  cargado abajo sea el real, no el de pruebas.
+                </p>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={formEmpresa.obligadoContabilidad}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, obligadoContabilidad: e.target.checked })}
+              />
+              Obligado a llevar contabilidad
+            </label>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={formEmpresa.agenteRetencion}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, agenteRetencion: e.target.checked })}
+              />
+              Agente de retención autorizado por el SRI
+            </label>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Ciclo de corte de internet por falta de pago
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 dark:text-gray-300">Del día</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={formEmpresa.diaInicioCorte}
+                  onChange={(e) => setFormEmpresa({ ...formEmpresa, diaInicioCorte: Number(e.target.value) })}
+                  className="w-16 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm text-center"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-300">al día</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={formEmpresa.diaFinCorte}
+                  onChange={(e) => setFormEmpresa({ ...formEmpresa, diaFinCorte: Number(e.target.value) })}
+                  className="w-16 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm text-center"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-300">de cada mes</span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Ventana para pagar la factura del plan de internet sin que se suspenda el servicio. Pasado el día{" "}
+                {formEmpresa.diaFinCorte || 5}, el sistema corta solo a quien no pagó — el día{" "}
+                {(formEmpresa.diaFinCorte || 5) + 1} arranca, en la práctica, el corte/facturación del mes. Editable
+                cada mes si hace falta.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Correo para el resumen diario
+              </label>
+              <input
+                type="text"
+                value={formEmpresa.emailResumenDestinatario}
+                onChange={(e) => setFormEmpresa({ ...formEmpresa, emailResumenDestinatario: e.target.value })}
+                placeholder="correo@negocio.com, otro@negocio.com"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Cuentas por cobrar pendientes, stock bajo, comprobantes sin autorizar y aviso de certificado
+                por caducar, una vez al día. Admite varios correos separados por coma. Vacío = no se envía
+                nada.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={guardarEmpresa.isPending}
+              className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {guardarEmpresa.isPending ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </form>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Certificado de firma electrónica</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          Archivo <code>.p12</code>/<code>.pfx</code> usado para firmar los comprobantes antes de enviarlos al
+          SRI. Subir uno nuevo reemplaza al anterior.
+        </p>
+
+        <p className="text-sm mb-4">
+          Estado actual:{" "}
+          {cargandoEmpresa ? (
+            <span className="text-gray-400 dark:text-gray-500">Cargando...</span>
+          ) : empresa?.tieneCertificado ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-medium">Certificado configurado</span>
+          ) : (
+            <span className="text-red-600 dark:text-red-400 font-medium">Sin certificado — no se pueden enviar comprobantes</span>
+          )}
+        </p>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (archivoCertificado && passwordCertificado) subirCertificado.mutate();
+          }}
+          className="space-y-3"
+        >
+          <input
+            type="file"
+            accept=".p12,.pfx"
+            onChange={(e) => setArchivoCertificado(e.target.files?.[0] ?? null)}
+            className="text-sm text-gray-700 dark:text-gray-300"
+          />
+          <input
+            type="password"
+            placeholder="Contraseña del certificado"
+            value={passwordCertificado}
+            onChange={(e) => setPasswordCertificado(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={!archivoCertificado || !passwordCertificado || subirCertificado.isPending}
+            className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {subirCertificado.isPending ? "Subiendo..." : "Subir certificado"}
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Logo de la empresa</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          Aparece en la esquina superior izquierda del PDF (RIDE) de facturas y notas de crédito. Formatos
+          admitidos: PNG o JPG, máximo 2MB.
+        </p>
+
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-28 h-20 border border-dashed border-gray-300 dark:border-gray-600 rounded-md flex items-center justify-center bg-gray-50 dark:bg-gray-900/40 shrink-0">
+            {isLoading ? (
+              <span className="text-xs text-gray-400 dark:text-gray-500">Cargando...</span>
+            ) : data?.logoUrl ? (
+              <img src={`${URL_BASE_API}${data.logoUrl}`} alt="Logo de la empresa" className="max-w-full max-h-full object-contain" />
+            ) : (
+              <span className="text-xs text-gray-400 dark:text-gray-500 text-center px-2">Sin logo configurado</span>
+            )}
+          </div>
+
+          {data?.logoUrl && (
+            <button
+              onClick={confirmarQuitar}
+              disabled={quitarLogo.isPending}
+              className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium disabled:opacity-50"
+            >
+              {quitarLogo.isPending ? "Quitando..." : "Quitar logo"}
+            </button>
+          )}
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (archivo) subirLogo.mutate();
+          }}
+          className="flex items-center gap-3"
+        >
+          <input
+            type="file"
+            accept="image/png,image/jpeg"
+            onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+            className="text-sm text-gray-700 dark:text-gray-300"
+          />
+          <button
+            type="submit"
+            disabled={!archivo || subirLogo.isPending}
+            className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {subirLogo.isPending ? "Subiendo..." : "Subir logo"}
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Respaldo de comprobantes autorizados</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          El SRI exige conservar los XML autorizados varios años. Configura <code>BACKUP_COMPROBANTES_PATH</code> en
+          el <code>.env</code> del backend (otro disco, una unidad de red, una carpeta sincronizada a la nube) para
+          que cada comprobante nuevo se guarde también ahí, además de la carpeta principal.
+        </p>
+
+        {cargandoBackup ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        ) : !backup?.configurado ? (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            No hay una ruta de respaldo configurada todavía.
+          </p>
+        ) : (
+          <div className="text-sm space-y-1 mb-4">
+            <p className="text-gray-500 dark:text-gray-400">
+              Ruta: <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{backup.carpetaBackup}</span>
+            </p>
+            <p className="text-gray-700 dark:text-gray-300">
+              Principal: <span className="font-semibold">{backup.totalPrincipal}</span> archivo(s) · Respaldo:{" "}
+              <span className={`font-semibold ${backup.totalBackup < backup.totalPrincipal ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                {backup.totalBackup}
+              </span>{" "}
+              archivo(s)
+            </p>
+          </div>
+        )}
+
+        {backup?.configurado && (
+          <button
+            onClick={() => ejecutarBackup.mutate()}
+            disabled={ejecutarBackup.isPending}
+            className="bg-slate-800 dark:bg-slate-700 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50"
+          >
+            {ejecutarBackup.isPending ? "Respaldando..." : "Ejecutar respaldo ahora"}
+          </button>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Respaldo de base de datos</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          El propio sistema hace un respaldo (dump) diario de la base de datos. Configura{" "}
+          <code>BACKUP_DB_PATH</code> en el <code>.env</code> del backend (otro disco, una unidad de red, una
+          carpeta sincronizada a la nube) para activarlo.
+        </p>
+
+        {cargandoBackupDb ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        ) : !backupDb?.configurado ? (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            No hay una ruta de respaldo configurada todavía.
+          </p>
+        ) : (
+          <div className="text-sm space-y-1 mb-4">
+            <p className={backupDb.atrasado ? "text-red-600 dark:text-red-400 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}>
+              {backupDb.atrasado ? "ATRASADO" : "Al día"}
+            </p>
+            <p className="text-gray-500 dark:text-gray-400">
+              Último exitoso:{" "}
+              {backupDb.ultimoExitoso ? new Date(backupDb.ultimoExitoso).toLocaleString("es-EC") : "nunca"}
+            </p>
+            {backupDb.ultimoError && (
+              <p className="text-gray-500 dark:text-gray-400">
+                Último error: <span className="text-red-600 dark:text-red-400">{backupDb.ultimoError}</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {backupDb?.configurado && (
+          <button
+            onClick={() => ejecutarBackupDb.mutate()}
+            disabled={ejecutarBackupDb.isPending}
+            className="bg-slate-800 dark:bg-slate-700 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50"
+          >
+            {ejecutarBackupDb.isPending ? "Respaldando..." : "Ejecutar respaldo ahora"}
+          </button>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Geocercas de sucursales</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          Ubicación y radio permitido para las marcaciones de entrada/salida de cada sucursal (ver la pestaña
+          "Marcaciones" en Nómina). Una marcación fuera de este radio igual se registra, solo queda marcada
+          para que la revises. Deja los tres campos vacíos para quitar la geocerca de una sucursal.
+        </p>
+
+        {cargandoSucursales ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        ) : (
+          <div className="space-y-4">
+            {sucursales?.map((s) => {
+              const form = geocercaForms[s.id];
+              if (!form) return null;
+              return (
+                <div key={s.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-3">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{s.nombre}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-2">
+                    Haz clic en el mapa (o arrastra el marcador) para ubicar el punto central de la geocerca.
+                  </p>
+                  <MapaGeocerca
+                    latitud={form.latitud}
+                    longitud={form.longitud}
+                    radioMetros={form.radioGeocercaMetros}
+                    onCambiarUbicacion={(lat, lng) =>
+                      setGeocercaForms({ ...geocercaForms, [s.id]: { ...form, latitud: lat, longitud: lng } })
+                    }
+                  />
+                  <div className="grid grid-cols-3 gap-2 mt-2 mb-2 items-end">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Lat: <span className="font-mono">{form.latitud || "—"}</span>
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Lng: <span className="font-mono">{form.longitud || "—"}</span>
+                    </p>
+                    <div>
+                      <label className="block text-[10px] text-gray-500 dark:text-gray-400">Radio (metros)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.radioGeocercaMetros}
+                        onChange={(e) => setGeocercaForms({ ...geocercaForms, [s.id]: { ...form, radioGeocercaMetros: e.target.value } })}
+                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm w-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => usarUbicacionActual(s.id)}
+                      className="text-xs font-medium text-slate-700 dark:text-slate-300 hover:underline"
+                    >
+                      Usar mi ubicación actual
+                    </button>
+                    <button
+                      onClick={() => guardarGeocerca.mutate(s.id)}
+                      disabled={guardarGeocerca.isPending}
+                      className="ml-auto bg-emerald-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {guardarGeocerca.isPending ? "Guardando..." : "Guardar"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <DiccionarioBuscador />
+    </div>
+  );
+}
