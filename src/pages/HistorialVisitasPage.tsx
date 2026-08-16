@@ -119,7 +119,7 @@ function SeccionPorTecnico() {
             <ResumenConteo visitas={visitas} />
             <button
               onClick={exportarExcel}
-              className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 mb-3 h-fit"
+              className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 mb-3 h-fit"
             >
               Exportar a Excel
             </button>
@@ -208,7 +208,7 @@ function SeccionPorCliente() {
             <ResumenConteo visitas={visitas} />
             <button
               onClick={exportarExcel}
-              className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 mb-3 h-fit"
+              className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 mb-3 h-fit"
             >
               Exportar a Excel
             </button>
@@ -242,7 +242,7 @@ export function HistorialVisitasPage() {
     <div>
       <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Historial de Visitas Técnicas</h2>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4">
           <button
             onClick={() => setPestana("tecnico")}

@@ -319,13 +319,13 @@ export function NodosPage() {
         <button
           type="submit"
           disabled={crear.isPending}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
         >
           {crear.isPending ? "Guardando..." : "+ Crear nodo"}
         </button>
       </form>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden max-w-4xl">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden max-w-4xl">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>
@@ -636,7 +636,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
               setVlanEditandoId(null);
               setForm(FORM_VLAN_VACIO);
             }}
-            className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700"
+            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
           >
             + Agregar VLAN
           </button>
@@ -745,7 +745,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
           <button
             type="submit"
             disabled={crear.isPending}
-            className="col-span-2 bg-emerald-600 text-white py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crear.isPending ? "Guardando..." : "Guardar VLAN"}
           </button>
@@ -934,7 +934,7 @@ function PanelRespaldosNodo({ nodo }: { nodo: NodoRed }) {
         <button
           onClick={() => respaldar.mutate()}
           disabled={respaldar.isPending}
-          className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+          className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
         >
           {respaldar.isPending ? "Respaldando..." : "Respaldar ahora"}
         </button>

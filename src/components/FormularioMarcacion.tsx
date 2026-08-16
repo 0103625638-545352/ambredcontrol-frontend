@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { Check } from "lucide-react";
 import { api } from "../api/client";
 
 interface Props {
@@ -85,17 +86,10 @@ export function FormularioMarcacion({ empresaId }: Props) {
             confirmacion.tipo === "ENTRADA" ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-sky-100 dark:bg-sky-900/40"
           }`}
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <Check
+            strokeWidth={2}
             className={`w-7 h-7 ${confirmacion.tipo === "ENTRADA" ? "text-emerald-600 dark:text-emerald-400" : "text-sky-600 dark:text-sky-400"}`}
-          >
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
+          />
         </div>
         <p className="text-base font-semibold text-gray-800 dark:text-gray-100">
           {confirmacion.tipo === "ENTRADA" ? "Entrada registrada" : "Salida registrada"}
@@ -144,7 +138,7 @@ export function FormularioMarcacion({ empresaId }: Props) {
         <button
           disabled={!formularioValido || marcar.isPending}
           onClick={() => marcar.mutate("ENTRADA")}
-          className="bg-emerald-600 text-white py-3 rounded-md text-sm font-semibold hover:bg-emerald-700 disabled:opacity-40"
+          className="bg-brand-600 text-white py-3 rounded-md text-sm font-semibold hover:bg-brand-700 disabled:opacity-40"
         >
           {marcar.isPending && marcar.variables === "ENTRADA" ? "..." : "Entrada"}
         </button>

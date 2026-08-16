@@ -38,6 +38,17 @@ export function ComprasPage() {
   const [proveedorId, setProveedorId] = useState<number | "">("");
   const [numeroFactura, setNumeroFactura] = useState("");
   const [fechaVencimiento, setFechaVencimiento] = useState("");
+  // Código de la tabla "Sustento Tributario" del SRI (ej. "01" crédito
+  // tributario IVA bienes) — a propósito texto libre, sin catálogo
+  // hardcodeado (mismo criterio que el código de retención en
+  // ModalGenerarRetencion.tsx): el SRI lo actualiza periódicamente.
+  const [sustentoTributario, setSustentoTributario] = useState("");
+  // Plan de cuotas del pago al proveedor (ver modelo Cuota) — a diferencia
+  // de PuntoDeVentaPage.tsx, acá no hay abono inicial: si se activa, el
+  // TOTAL de la compra se reparte en partes iguales entre las N cuotas.
+  const [usarCuotas, setUsarCuotas] = useState(false);
+  const [numeroCuotas, setNumeroCuotas] = useState(2);
+  const [fechasCuotas, setFechasCuotas] = useState<string[]>(["", ""]);
   const [busquedaProducto, setBusquedaProducto] = useState("");
   const [pagina, setPagina] = useState(1);
   const [compraPagoId, setCompraPagoId] = useState<number | null>(null);
@@ -127,6 +138,19 @@ export function ComprasPage() {
         (!item.producto.manejaLotes || item.fechaCaducidad !== "")
     );
 
+  // Reparto en partes iguales del TOTAL de la compra — la última cuota
+  // absorbe el centavo de redondeo, mismo criterio que PuntoDeVentaPage.tsx.
+  const cuotasCalculadas =
+    usarCuotas && totalCarrito > 0
+      ? Array.from({ length: numeroCuotas }, (_, i) => {
+          const montoBase = Math.floor((totalCarrito / numeroCuotas) * 100) / 100;
+          const esUltima = i === numeroCuotas - 1;
+          const monto = esUltima ? Number((totalCarrito - montoBase * (numeroCuotas - 1)).toFixed(2)) : montoBase;
+          return { numero: i + 1, monto, fechaVencimiento: fechasCuotas[i] || "" };
+        })
+      : [];
+  const cuotasValidas = !usarCuotas || (cuotasCalculadas.length > 0 && cuotasCalculadas.every((c) => c.fechaVencimiento !== ""));
+
   const registrarCompra = useMutation({
     mutationFn: async () => {
       return api.post("/compras", {
@@ -134,6 +158,7 @@ export function ComprasPage() {
         numeroFactura,
         bodegaId,
         fechaVencimiento: fechaVencimiento || undefined,
+        sustentoTributario,
         items: carrito.map((item) => ({
           productoId: item.producto.id,
           cantidad: item.cantidad,
@@ -141,6 +166,7 @@ export function ComprasPage() {
           numeroLote: item.producto.manejaLotes ? item.numeroLote || undefined : undefined,
           fechaCaducidad: item.producto.manejaLotes ? item.fechaCaducidad : undefined,
         })),
+        ...(usarCuotas && cuotasCalculadas.length > 0 ? { cuotas: cuotasCalculadas } : {}),
       });
     },
     onSuccess: () => {
@@ -150,7 +176,11 @@ export function ComprasPage() {
       setProveedorId("");
       setNumeroFactura("");
       setFechaVencimiento("");
+      setSustentoTributario("");
       setBodegaId(""); // el efecto de arriba la vuelve a preseleccionar si hay una sola bodega
+      setUsarCuotas(false);
+      setNumeroCuotas(2);
+      setFechasCuotas(["", ""]);
     },
   });
 
@@ -164,6 +194,31 @@ export function ComprasPage() {
       mostrarToast(error.response?.data?.error ?? "Error al anular la compra");
     },
   });
+
+  // Edición del sustento tributario de una compra YA EXISTENTE — es el único
+  // campo editable después de creada (ver PATCH /compras/:id/sustento-tributario
+  // en el backend), pensado sobre todo para completar compras registradas
+  // antes de que este campo existiera, así el reporte ATS no se queda con
+  // esa columna vacía para siempre.
+  const [compraSustentoEditId, setCompraSustentoEditId] = useState<number | null>(null);
+  const [formSustento, setFormSustento] = useState("");
+
+  const editarSustentoTributario = useMutation({
+    mutationFn: async (compraId: number) =>
+      api.patch(`/compras/${compraId}/sustento-tributario`, { sustentoTributario: formSustento }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["compras"] });
+      setCompraSustentoEditId(null);
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al actualizar el sustento tributario");
+    },
+  });
+
+  function abrirEdicionSustento(c: Compra) {
+    setFormSustento(c.sustentoTributario ?? "");
+    setCompraSustentoEditId(compraSustentoEditId === c.id ? null : c.id);
+  }
 
   async function confirmarAnulacion(c: Compra) {
     const ok = await confirmar(
@@ -190,7 +245,7 @@ export function ComprasPage() {
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Registrar compra</h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Columna izquierda: buscar productos para agregar */}
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Productos</h3>
             <input
               type="text"
@@ -225,7 +280,7 @@ export function ComprasPage() {
           </div>
 
           {/* Columna derecha: datos de la compra */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex flex-col">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Datos de la compra</h3>
 
             <BuscadorProveedor proveedorId={proveedorId} onSeleccionar={setProveedorId} />
@@ -260,6 +315,68 @@ export function ComprasPage() {
                 onChange={(e) => setFechaVencimiento(e.target.value)}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
               />
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Sustento tributario (SRI)</label>
+              <input
+                type="text"
+                placeholder="Ej: 01, 06..."
+                required
+                value={sustentoTributario}
+                onChange={(e) => setSustentoTributario(e.target.value)}
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="border border-gray-200 dark:border-gray-700 rounded-md p-2 space-y-2 mb-3">
+              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={usarCuotas}
+                  onChange={(e) => setUsarCuotas(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                Pagar al proveedor en cuotas
+              </label>
+              {usarCuotas && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500 dark:text-gray-400 shrink-0">N° de cuotas</label>
+                    <select
+                      value={numeroCuotas}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        setNumeroCuotas(n);
+                        setFechasCuotas((actual) => Array.from({ length: n }, (_, i) => actual[i] ?? ""));
+                      }}
+                      className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">Total: ${totalCarrito.toFixed(2)}</span>
+                  </div>
+                  {cuotasCalculadas.map((c, i) => (
+                    <div key={c.numero} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 w-16 shrink-0">Cuota {c.numero}</span>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-16 shrink-0">
+                        ${c.monto.toFixed(2)}
+                      </span>
+                      <input
+                        type="date"
+                        required
+                        value={fechasCuotas[i] || ""}
+                        onChange={(e) => setFechasCuotas((actual) => actual.map((f, idx) => (idx === i ? e.target.value : f)))}
+                        className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                      />
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
             <div className="flex-1 space-y-3 mb-3">
@@ -333,8 +450,16 @@ export function ComprasPage() {
               </div>
               <button
                 onClick={() => registrarCompra.mutate()}
-                disabled={!carritoValido || !proveedorId || !numeroFactura || !bodegaId || registrarCompra.isPending}
-                className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+                disabled={
+                  !carritoValido ||
+                  !proveedorId ||
+                  !numeroFactura ||
+                  !bodegaId ||
+                  !sustentoTributario.trim() ||
+                  !cuotasValidas ||
+                  registrarCompra.isPending
+                }
+                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
               >
                 {registrarCompra.isPending ? "Registrando..." : "Registrar compra"}
               </button>
@@ -350,7 +475,7 @@ export function ComprasPage() {
 
       <div>
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Historial de compras</h2>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr>
@@ -360,18 +485,19 @@ export function ComprasPage() {
                 <th className="px-4 py-2 text-right">Total</th>
                 <th className="px-4 py-2">Estado</th>
                 <th className="px-4 py-2">Pago</th>
+                <th className="px-4 py-2">Sustento SRI</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {cargandoCompras && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
+                  <td colSpan={8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
                 </tr>
               )}
               {!cargandoCompras && compras?.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">No hay compras registradas</td>
+                  <td colSpan={8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">No hay compras registradas</td>
                 </tr>
               )}
               {compras?.map((c) => {
@@ -395,6 +521,51 @@ export function ComprasPage() {
                           <span className="text-[10px] text-gray-400 dark:text-gray-500">Saldo: ${saldo}</span>
                         )}
                       </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    {compraSustentoEditId === c.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          editarSustentoTributario.mutate(c.id);
+                        }}
+                        className="flex items-center gap-1"
+                      >
+                        <input
+                          autoFocus
+                          required
+                          value={formSustento}
+                          onChange={(e) => setFormSustento(e.target.value)}
+                          placeholder="Ej: 01"
+                          className="w-16 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-1.5 py-1 text-xs"
+                        />
+                        <button
+                          type="submit"
+                          disabled={editarSustentoTributario.isPending}
+                          className="text-emerald-700 dark:text-emerald-400 hover:underline text-xs font-medium"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCompraSustentoEditId(null)}
+                          className="text-gray-500 dark:text-gray-400 hover:underline text-xs"
+                        >
+                          Cancelar
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        onClick={() => abrirEdicionSustento(c)}
+                        className={
+                          c.sustentoTributario
+                            ? "font-mono text-xs text-gray-700 dark:text-gray-200 hover:underline"
+                            : "text-xs text-amber-600 dark:text-amber-400 hover:underline"
+                        }
+                      >
+                        {c.sustentoTributario ?? "Falta — editar"}
+                      </button>
                     )}
                   </td>
                   <td className="px-4 py-2 text-right space-x-3">

@@ -1,5 +1,44 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  Users,
+  FileText,
+  FileCheck2,
+  FileClock,
+  FileMinus2,
+  Truck,
+  Wallet,
+  ShoppingBag,
+  Undo2,
+  Barcode,
+  Warehouse,
+  LayoutGrid,
+  ArrowLeftRight,
+  BarChart3,
+  Table2,
+  UserCog,
+  Tags,
+  Landmark,
+  Building2,
+  History,
+  Calculator,
+  FileSpreadsheet,
+  IdCard,
+  Banknote,
+  Settings,
+  MapPin,
+  CalendarClock,
+  Router,
+  Wifi,
+  Network,
+  Receipt,
+  Info,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react";
 import { api, type DashboardResumen } from "../api/client";
 
 export type Pestana =
@@ -20,12 +59,14 @@ export type Pestana =
   | "categorias"
   | "tiposPrecio"
   | "cuentasBancarias"
+  | "bancos"
   | "traslados"
   | "reportes"
   | "reporteadorPrincipal"
   | "usuarios"
   | "auditoria"
   | "contabilidad"
+  | "ats"
   | "empleados"
   | "nomina"
   | "visitas"
@@ -75,244 +116,59 @@ interface Props {
 
 const trazo = "w-4 h-4 shrink-0";
 
-const iconos: Record<Pestana, ReactNode> = {
-  dashboard: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="3" y="3" width="7" height="9" rx="1" />
-      <rect x="14" y="3" width="7" height="5" rx="1" />
-      <rect x="14" y="12" width="7" height="9" rx="1" />
-      <rect x="3" y="16" width="7" height="5" rx="1" />
-    </svg>
-  ),
-  venta: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="9" cy="21" r="1" />
-      <circle cx="19" cy="21" r="1" />
-      <path d="M1 1h3l2.4 12.4a2 2 0 0 0 2 1.6h9.2a2 2 0 0 0 2-1.6L21 6H6" />
-    </svg>
-  ),
-  productos: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M21 8l-9-5-9 5 9 5 9-5Z" />
-      <path d="M3 8v8l9 5 9-5V8M12 13v8" />
-    </svg>
-  ),
-  clientes: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="9" cy="7" r="4" />
-      <path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2" />
-      <path d="M17 3.5a4 4 0 0 1 0 7.5M22 21v-2a5 5 0 0 0-3.5-4.8" />
-    </svg>
-  ),
-  facturas: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M6 2l1.5 1.5L9 2l1.5 1.5L12 2l1.5 1.5L15 2l1.5 1.5L18 2v20l-1.5-1.5L15 22l-1.5-1.5L12 22l-1.5-1.5L9 22l-1.5-1.5L6 22V2Z" />
-      <path d="M9 8h6M9 12h6M9 16h4" />
-    </svg>
-  ),
-  notasVenta: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-      <path d="M14 2v6h6M9 15l2 2 4-4" />
-    </svg>
-  ),
-  notasCredito: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-      <path d="M14 2v6h6M9 13h6M9 17h4" />
-    </svg>
-  ),
-  guiasRemision: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="1" y="7" width="15" height="11" rx="1" />
-      <path d="M16 10h3l3 3v5h-6" />
-      <circle cx="6" cy="19.5" r="1.5" />
-      <circle cx="18" cy="19.5" r="1.5" />
-    </svg>
-  ),
-  proformas: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" strokeDasharray="3 2" />
-      <path d="M14 2v6h6M9 13h6M9 17h4" />
-    </svg>
-  ),
-  caja: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="2" y="6" width="20" height="14" rx="2" />
-      <circle cx="12" cy="13" r="3" />
-      <path d="M6 6V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" />
-    </svg>
-  ),
-  compras: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M3 6h18l-1.68 10.1A2 2 0 0 1 17.34 18H6.66a2 2 0 0 1-1.98-1.9L3 6Z" />
-      <path d="M3 6l-1-3M8 10v4M12 10v4M16 10v4" />
-    </svg>
-  ),
-  devolucionesCompra: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M3 6h18l-1.68 10.1A2 2 0 0 1 17.34 18H6.66a2 2 0 0 1-1.98-1.9L3 6Z" />
-      <path d="M9 10l-3 3 3 3M6 13h6" />
-    </svg>
-  ),
-  seriesProductos: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M3 7h1.5v10H3zM6 7h1v10H6zM9 7h2v10H9zM13 7h1v10h-1zM16 7h2v10h-2zM20 7h1v10h-1z" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-  proveedores: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="2" y="7" width="20" height="13" rx="1" />
-      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12h20" />
-    </svg>
-  ),
-  categorias: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="3" y="3" width="8" height="8" rx="1" />
-      <rect x="13" y="3" width="8" height="8" rx="1" />
-      <rect x="3" y="13" width="8" height="8" rx="1" />
-      <rect x="13" y="13" width="8" height="8" rx="1" />
-    </svg>
-  ),
-  traslados: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M7 16V4M7 4l-3 3M7 4l3 3" />
-      <path d="M17 8v12M17 20l3-3M17 20l-3-3" />
-    </svg>
-  ),
-  reportes: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M3 3v18h18" />
-      <path d="M7 15l4-4 3 3 5-6" />
-    </svg>
-  ),
-  reporteadorPrincipal: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M3 9h18M9 21V9" />
-    </svg>
-  ),
-  usuarios: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
-    </svg>
-  ),
-  tiposPrecio: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-    </svg>
-  ),
-  cuentasBancarias: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M3 10l9-6 9 6" />
-      <path d="M4 10v9h16v-9" />
-      <path d="M9 21v-6h6v6" />
-    </svg>
-  ),
-  auditoria: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M12 8v4l3 3" />
-      <circle cx="12" cy="12" r="9" />
-    </svg>
-  ),
-  contabilidad: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M3 10h18M9 4v16" />
-    </svg>
-  ),
-  empleados: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="9" cy="7" r="3" />
-      <circle cx="17" cy="8" r="2.5" />
-      <path d="M3 21v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2M15.5 13.2A4.5 4.5 0 0 1 21 17.5V19" />
-    </svg>
-  ),
-  nomina: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M8 9h8M8 13h5M7 17h3" />
-      <circle cx="17" cy="16.5" r="2.5" />
-      <path d="M17 15.3v1.2l0.8 0.8" />
-    </svg>
-  ),
-  ajustes: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-    </svg>
-  ),
-  visitas: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" />
-      <circle cx="12" cy="9.5" r="2.5" />
-    </svg>
-  ),
-  historialVisitas: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3.5 2" />
-    </svg>
-  ),
-  mikrotik: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <rect x="2" y="4" width="20" height="12" rx="2" />
-      <path d="M6 20h.01M10 20h.01M14 20h.01M18 20h.01" />
-      <path d="M6 9h.01M6 12h.01" />
-    </svg>
-  ),
-  planesInternet: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M2 8.5a14 14 0 0 1 20 0" />
-      <path d="M5 12a9.5 9.5 0 0 1 14 0" />
-      <path d="M8.5 15.5a5 5 0 0 1 7 0" />
-      <circle cx="12" cy="19" r="1.1" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-  nodos: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="12" cy="5" r="2.2" />
-      <circle cx="5" cy="19" r="2.2" />
-      <circle cx="19" cy="19" r="2.2" />
-      <path d="M12 7.2V12M12 12L6.5 17M12 12L17.5 17" />
-    </svg>
-  ),
-  facturacionInternet: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <path d="M6 2l1.5 1.5L9 2l1.5 1.5L12 2l1.5 1.5L15 2l1.5 1.5L18 2v20l-1.5-1.5L15 22l-1.5-1.5L12 22l-1.5-1.5L9 22l-1.5-1.5L6 22V2Z" />
-      <path d="M8.5 10.5a5 5 0 0 1 7 0M10.5 12.8a2.2 2.2 0 0 1 3 0" />
-      <circle cx="12" cy="15.3" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
-  ),
+// Ícono por pestaña, vía lucide-react (antes: 36 SVG dibujados a mano acá
+// mismo). Un componente por clave en vez de nodos ya renderizados, para
+// poder fijarle stroke/tamaño una sola vez abajo en <Icono>.
+const iconosPorPestana: Record<Pestana, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  venta: ShoppingCart,
+  productos: Package,
+  clientes: Users,
+  facturas: FileText,
+  notasVenta: FileCheck2,
+  notasCredito: FileMinus2,
+  guiasRemision: Truck,
+  proformas: FileClock,
+  caja: Wallet,
+  compras: ShoppingBag,
+  devolucionesCompra: Undo2,
+  seriesProductos: Barcode,
+  proveedores: Warehouse,
+  categorias: LayoutGrid,
+  traslados: ArrowLeftRight,
+  reportes: BarChart3,
+  reporteadorPrincipal: Table2,
+  usuarios: UserCog,
+  tiposPrecio: Tags,
+  cuentasBancarias: Landmark,
+  bancos: Building2,
+  auditoria: History,
+  contabilidad: Calculator,
+  ats: FileSpreadsheet,
+  empleados: IdCard,
+  nomina: Banknote,
+  ajustes: Settings,
+  visitas: MapPin,
+  historialVisitas: CalendarClock,
+  mikrotik: Router,
+  planesInternet: Wifi,
+  nodos: Network,
+  facturacionInternet: Receipt,
   // No aparece en el menú lateral a propósito — el acceso vive en el
   // encabezado junto a "Cambiar contraseña" (ver App.tsx), pero el ícono
   // igual se define acá para que este Record siga siendo exhaustivo sobre
   // Pestana (si algún día se agrega al menú, ya está listo).
-  acercaDe: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={trazo}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 16v-4M12 8h.01" />
-    </svg>
-  ),
+  acercaDe: Info,
 };
 
-// Ícono de flecha usado para expandir/colapsar cada grupo del menú.
-function Chevron({ abierto }: { abierto: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={`w-3.5 h-3.5 transition-transform ${abierto ? "rotate-90" : ""}`}
-    >
-      <path d="M9 18l6-6-6-6" />
-    </svg>
-  );
+function Icono({ pestana }: { pestana: Pestana }) {
+  const IconoSvg = iconosPorPestana[pestana];
+  return <IconoSvg strokeWidth={1.75} className={trazo} />;
 }
+
+const iconos: Record<Pestana, ReactNode> = Object.fromEntries(
+  (Object.keys(iconosPorPestana) as Pestana[]).map((p) => [p, <Icono key={p} pestana={p} />])
+) as Record<Pestana, ReactNode>;
 
 export function Sidebar({
   pestanaActiva,
@@ -354,7 +210,9 @@ export function Sidebar({
   // Grupo nuevo (antes ambos vivían sueltos en Administración).
   const itemsContabilidad: Item[] = [
     ...(esAdmin ? ([{ id: "cuentasBancarias", etiqueta: "Cuentas Bancarias", icono: iconos.cuentasBancarias }] as Item[]) : []),
+    ...(esAdmin ? ([{ id: "bancos", etiqueta: "Bancos", icono: iconos.bancos }] as Item[]) : []),
     ...(puedeContabilidad ? ([{ id: "contabilidad", etiqueta: "Contabilidad", icono: iconos.contabilidad }] as Item[]) : []),
+    ...(puedeContabilidad ? ([{ id: "ats", etiqueta: "ATS", icono: iconos.ats }] as Item[]) : []),
   ];
 
   // Grupo nuevo (antes vivían sueltos en Administración). "Visitas Técnicas"
@@ -439,8 +297,10 @@ export function Sidebar({
     ...(puedeCompras ? ([{ id: "seriesProductos", etiqueta: "Números de Serie", icono: iconos.seriesProductos }] as Item[]) : []),
   ];
 
+  // El Dashboard ya NO es un ítem de este menú — es la pantalla principal
+  // (arranca ahí, ver App.tsx) y se vuelve a ella haciendo clic en el
+  // nombre de la app en el encabezado, no con un botón dedicado acá.
   const grupos: Grupo[] = [
-    { titulo: "Menú principal", items: [{ id: "dashboard", etiqueta: "Dashboard", icono: iconos.dashboard }] },
     // Si ningún ítem del grupo es visible para este usuario, el grupo entero
     // se omite — así nunca aparece un título sin nada debajo.
     ...(itemsComprobantes.length > 0 ? ([{ titulo: "Comprobantes", items: itemsComprobantes }] as Grupo[]) : []),
@@ -483,6 +343,10 @@ export function Sidebar({
         abierto ? "w-56" : "w-0 overflow-hidden"
       }`}
     >
+      {/* Franja superior de marca — el mismo acento que PageHeader.tsx usa
+          en cada pantalla, reforzando la identidad visual en el único lugar
+          que se ve siempre, sin importar la pestaña activa. */}
+      <div className="h-1 w-56 bg-brand-600" />
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 w-56">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
           Ambiente: <span className="text-gray-700 dark:text-gray-200">{data?.ambiente ?? "..."}</span>
@@ -502,7 +366,7 @@ export function Sidebar({
                 className="w-full flex items-center justify-between px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {grupo.titulo}
-                <Chevron abierto={!grupoColapsado} />
+                <ChevronRight strokeWidth={2} className={`w-3.5 h-3.5 transition-transform ${!grupoColapsado ? "rotate-90" : ""}`} />
               </button>
               {!grupoColapsado && (
                 <ul>
@@ -512,7 +376,7 @@ export function Sidebar({
                         onClick={() => onSeleccionar(item.id)}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium border-l-2 transition-colors ${
                           pestanaActiva === item.id
-                            ? "border-sky-600 dark:border-sky-400 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
+                            ? "border-brand-600 dark:border-brand-400 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300"
                             : "border-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                         }`}
                       >

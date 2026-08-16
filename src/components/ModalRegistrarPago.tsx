@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type CuentaBancaria } from "../api/client";
+import { api, type CuentaBancaria, type Cuota } from "../api/client";
 import { Modal } from "./Modal";
+import { SelectorBanco } from "./SelectorBanco";
 import { useToast } from "./ToastProvider";
 
 interface Props {
@@ -40,6 +41,16 @@ export function ModalRegistrarPago({
   const [formaPago, setFormaPago] = useState("EFECTIVO");
   const [referencia, setReferencia] = useState("");
   const [cuentaBancariaId, setCuentaBancariaId] = useState<number | "">("");
+  // Datos de ORIGEN del pago (banco/cuenta/tarjeta de quien pagó) — cuáles se
+  // piden depende de formaPago, ver los bloques condicionales más abajo.
+  const [bancoOrigenId, setBancoOrigenId] = useState<number | "">("");
+  const [numeroCuentaOrigen, setNumeroCuentaOrigen] = useState("");
+  const [tarjetaUltimosDigitos, setTarjetaUltimosDigitos] = useState("");
+  const [tarjetaTipo, setTarjetaTipo] = useState("DEBITO");
+  const [tarjetaReferencia, setTarjetaReferencia] = useState("");
+  const [tarjetaLote, setTarjetaLote] = useState("");
+  const [chequeNumero, setChequeNumero] = useState("");
+  const [chequeFechaCobro, setChequeFechaCobro] = useState("");
 
   const exigeCuentaBancaria = FORMAS_QUE_EXIGEN_CUENTA.includes(formaPago);
   const { data: cuentasBancarias } = useQuery({
@@ -48,6 +59,24 @@ export function ModalRegistrarPago({
     enabled: exigeCuentaBancaria,
   });
 
+  // Si este documento tiene un plan de Cuotas (ver modelo Cuota), el cobro
+  // es ESTRICTO: solo se puede pagar la próxima pendiente, en orden, y por
+  // su monto EXACTO — el backend lo vuelve a validar igual, esto es solo
+  // para que el monto ya venga bien puesto y no haga falta adivinarlo.
+  // `endpoint` viene como ".../pagos"; el documento en sí vive un nivel
+  // arriba. Compras no tiene Cuota, así que ahí "cuotas" simplemente no
+  // viene en la respuesta y este bloque no cambia nada.
+  const endpointBase = endpoint.replace(/\/pagos$/, "");
+  const { data: documentoConCuotas } = useQuery({
+    queryKey: ["documento-para-pago", endpointBase],
+    queryFn: async () => (await api.get<{ cuotas?: Cuota[] }>(endpointBase)).data,
+  });
+  const proximaCuota = documentoConCuotas?.cuotas?.find((c: Cuota) => c.estado === "PENDIENTE");
+
+  useEffect(() => {
+    if (proximaCuota) setMonto(proximaCuota.monto);
+  }, [proximaCuota?.id, proximaCuota?.monto]);
+
   const registrarPago = useMutation({
     mutationFn: async () => {
       return api.post(endpoint, {
@@ -55,6 +84,14 @@ export function ModalRegistrarPago({
         formaPago,
         referencia: referencia || undefined,
         cuentaBancariaId: exigeCuentaBancaria ? cuentaBancariaId : undefined,
+        bancoOrigenId: formaPago === "TRANSFERENCIA" || formaPago === "TARJETA" || formaPago === "CHEQUE" ? bancoOrigenId || undefined : undefined,
+        numeroCuentaOrigen: formaPago === "TRANSFERENCIA" ? numeroCuentaOrigen || undefined : undefined,
+        tarjetaUltimosDigitos: formaPago === "TARJETA" ? tarjetaUltimosDigitos || undefined : undefined,
+        tarjetaTipo: formaPago === "TARJETA" ? tarjetaTipo : undefined,
+        tarjetaReferencia: formaPago === "TARJETA" ? tarjetaReferencia || undefined : undefined,
+        tarjetaLote: formaPago === "TARJETA" ? tarjetaLote || undefined : undefined,
+        chequeNumero: formaPago === "CHEQUE" ? chequeNumero || undefined : undefined,
+        chequeFechaCobro: formaPago === "CHEQUE" ? chequeFechaCobro || undefined : undefined,
       });
     },
     onSuccess: (respuesta) => {
@@ -89,16 +126,25 @@ export function ModalRegistrarPago({
         }}
         className="space-y-3"
       >
+        {proximaCuota && (
+          <p className="text-xs bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 rounded-md px-3 py-2">
+            Este documento tiene un plan de cuotas — hay que pagar la <strong>cuota {proximaCuota.numero}</strong>{" "}
+            (vence {new Date(proximaCuota.fechaVencimiento).toLocaleDateString("es-EC")}) por su monto exacto, en
+            orden.
+          </p>
+        )}
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="block text-xs text-gray-600 dark:text-gray-400">Monto</label>
-            <button
-              type="button"
-              onClick={() => setMonto(saldoPendiente)}
-              className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
-            >
-              Usar saldo completo (${saldoPendiente})
-            </button>
+            {!proximaCuota && (
+              <button
+                type="button"
+                onClick={() => setMonto(saldoPendiente)}
+                className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
+              >
+                Usar saldo completo (${saldoPendiente})
+              </button>
+            )}
           </div>
           <input
             type="number"
@@ -107,10 +153,13 @@ export function ModalRegistrarPago({
             max={saldoPendiente}
             required
             autoFocus
+            readOnly={!!proximaCuota}
             placeholder="0.00"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className={`w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-gray-100 ${
+              proximaCuota ? "bg-gray-100 dark:bg-gray-900" : "bg-white dark:bg-gray-700"
+            }`}
           />
         </div>
         <div>
@@ -120,6 +169,7 @@ export function ModalRegistrarPago({
             onChange={(e) => {
               setFormaPago(e.target.value);
               setCuentaBancariaId("");
+              setBancoOrigenId("");
             }}
             className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
           >
@@ -156,6 +206,97 @@ export function ModalRegistrarPago({
             )}
           </div>
         )}
+        {formaPago === "TRANSFERENCIA" && (
+          <div className="grid grid-cols-2 gap-3">
+            <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco de procedencia" />
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de cuenta de origen</label>
+              <input
+                type="text"
+                placeholder="Cuenta de la que salió el dinero"
+                value={numeroCuentaOrigen}
+                onChange={(e) => setNumeroCuentaOrigen(e.target.value)}
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        )}
+        {formaPago === "TARJETA" && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Últimos 4 dígitos</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="1234"
+                  value={tarjetaUltimosDigitos}
+                  onChange={(e) => setTarjetaUltimosDigitos(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+                <select
+                  value={tarjetaTipo}
+                  onChange={(e) => setTarjetaTipo(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="DEBITO">Débito</option>
+                  <option value="CREDITO">Crédito</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de referencia</label>
+                <input
+                  type="text"
+                  placeholder="Del voucher del datáfono"
+                  value={tarjetaReferencia}
+                  onChange={(e) => setTarjetaReferencia(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de lote</label>
+                <input
+                  type="text"
+                  placeholder="Del voucher del datáfono"
+                  value={tarjetaLote}
+                  onChange={(e) => setTarjetaLote(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        {formaPago === "CHEQUE" && (
+          <div className="grid grid-cols-3 gap-3">
+            <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de cheque</label>
+              <input
+                type="text"
+                placeholder="Ej: 000123"
+                value={chequeNumero}
+                onChange={(e) => setChequeNumero(e.target.value)}
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Fecha de cobro</label>
+              <input
+                type="date"
+                value={chequeFechaCobro}
+                onChange={(e) => setChequeFechaCobro(e.target.value)}
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        )}
         <div>
           <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Referencia (opcional)</label>
           <input
@@ -169,7 +310,7 @@ export function ModalRegistrarPago({
         <button
           type="submit"
           disabled={registrarPago.isPending || (exigeCuentaBancaria && !cuentaBancariaId)}
-          className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
         >
           {registrarPago.isPending ? "Registrando..." : "Registrar pago"}
         </button>

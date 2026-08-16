@@ -84,7 +84,7 @@ function PanelPendientes() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
           <tr>
@@ -132,7 +132,7 @@ function PanelPendientes() {
                       <button
                         disabled={capturar.isPending || lineasTexto.length === 0 || lineasTexto.length > p.faltantes}
                         onClick={() => capturar.mutate({ compraDetalleId: p.compraDetalleId, series: lineasTexto })}
-                        className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+                        className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
                       >
                         {capturar.isPending ? "Guardando..." : `Guardar ${lineasTexto.length} serie(s)`}
                       </button>
@@ -216,7 +216,7 @@ function PanelBuscar() {
       )}
 
       {resultados && resultados.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr>
@@ -281,7 +281,7 @@ function PanelBuscar() {
                           <button
                             disabled={!clienteId || entregar.isPending}
                             onClick={() => clienteId && entregar.mutate({ serieId: s.id, clienteId, referenciaDocumento: referencia })}
-                            className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+                            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
                           >
                             {entregar.isPending ? "Guardando..." : "Confirmar entrega"}
                           </button>

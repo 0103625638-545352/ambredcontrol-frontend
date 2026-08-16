@@ -54,7 +54,7 @@ export function ModalNuevoCliente({ identificacionInicial = "", onCerrar, onCrea
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-5"
+        className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 shadow-lg w-full max-w-md p-5"
       >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Nuevo cliente</h3>
@@ -140,7 +140,7 @@ export function ModalNuevoCliente({ identificacionInicial = "", onCerrar, onCrea
           <button
             type="submit"
             disabled={crearCliente.isPending}
-            className="col-span-2 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearCliente.isPending ? "Guardando..." : "Guardar y seleccionar"}
           </button>

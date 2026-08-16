@@ -224,14 +224,14 @@ function PestanaRolDePagos({ puedeEditar }: { puedeEditar: boolean }) {
             <input type="number" step="0.01" min="0" value={otrosDescuentos} onChange={(e) => setOtrosDescuentos(e.target.value)} className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full" />
           </div>
           <input placeholder="Detalle del descuento (opcional)" value={otrosDescuentosDetalle} onChange={(e) => setOtrosDescuentosDetalle(e.target.value)} className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2" />
-          <button type="submit" disabled={generar.isPending} className="bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+          <button type="submit" disabled={generar.isPending} className="bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50">
             {generar.isPending ? "Generando..." : "Generar rol de pagos"}
           </button>
           {generar.isError && <p className="col-span-3 text-red-600 dark:text-red-400 text-sm">{(generar.error as any)?.response?.data?.error ?? "Error"}</p>}
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>
@@ -326,11 +326,11 @@ function PestanaDecimos({ puedeEditar }: { puedeEditar: boolean }) {
               {empleados?.map((emp) => <option key={emp.id} value={emp.id}>{emp.nombres} {emp.apellidos}</option>)}
             </select>
             <input type="number" value={anioTercero} onChange={(e) => setAnioTercero(e.target.value)} className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-24" />
-            <button type="submit" disabled={calcularTercero.isPending} className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">Calcular</button>
+            <button type="submit" disabled={calcularTercero.isPending} className="bg-brand-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50">Calcular</button>
             {calcularTercero.isError && <p className="text-red-600 dark:text-red-400 text-xs w-full">{(calcularTercero.error as any)?.response?.data?.error}</p>}
           </form>
         )}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr><th className="px-4 py-2">Empleado</th><th className="px-4 py-2">Año</th><th className="px-4 py-2 text-right">Valor</th><th className="px-4 py-2">Estado</th><th className="px-4 py-2"></th></tr>
@@ -363,11 +363,11 @@ function PestanaDecimos({ puedeEditar }: { puedeEditar: boolean }) {
               {empleados?.map((emp) => <option key={emp.id} value={emp.id}>{emp.nombres} {emp.apellidos}</option>)}
             </select>
             <input type="number" value={anioCuarto} onChange={(e) => setAnioCuarto(e.target.value)} className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-24" />
-            <button type="submit" disabled={calcularCuarto.isPending} className="bg-emerald-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">Calcular</button>
+            <button type="submit" disabled={calcularCuarto.isPending} className="bg-brand-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50">Calcular</button>
             {calcularCuarto.isError && <p className="text-red-600 dark:text-red-400 text-xs w-full">{(calcularCuarto.error as any)?.response?.data?.error}</p>}
           </form>
         )}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr><th className="px-4 py-2">Empleado</th><th className="px-4 py-2">Año</th><th className="px-4 py-2">Meses</th><th className="px-4 py-2 text-right">Valor</th><th className="px-4 py-2">Estado</th><th className="px-4 py-2"></th></tr>
@@ -477,14 +477,14 @@ function PestanaVacaciones({ puedeEditar }: { puedeEditar: boolean }) {
             <input type="checkbox" checked={pagarEnDinero} onChange={(e) => setPagarEnDinero(e.target.checked)} />
             Pagar en dinero (no gozadas)
           </label>
-          <button type="submit" disabled={registrar.isPending} className="col-span-2 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+          <button type="submit" disabled={registrar.isPending} className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50">
             {registrar.isPending ? "Guardando..." : "Registrar vacaciones"}
           </button>
           {registrar.isError && <p className="col-span-2 text-red-600 dark:text-red-400 text-sm">{(registrar.error as any)?.response?.data?.error}</p>}
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr><th className="px-4 py-2">Empleado</th><th className="px-4 py-2">Período</th><th className="px-4 py-2">Días</th><th className="px-4 py-2 text-right">Valor pagado</th><th className="px-4 py-2"></th></tr>
@@ -544,14 +544,14 @@ function PestanaUtilidades({ puedeEditar }: { puedeEditar: boolean }) {
             <label className="block text-[10px] text-gray-500 dark:text-gray-400">Año a repartir</label>
             <input type="number" value={anio} onChange={(e) => setAnio(e.target.value)} className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-24" />
           </div>
-          <button type="submit" disabled={calcular.isPending} className="bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+          <button type="submit" disabled={calcular.isPending} className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50">
             {calcular.isPending ? "Calculando..." : "Calcular utilidades"}
           </button>
           {calcular.isError && <p className="text-red-600 dark:text-red-400 text-sm w-full">{(calcular.error as any)?.response?.data?.error}</p>}
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr><th className="px-4 py-2">Año</th><th className="px-4 py-2 text-right">Utilidad neta</th><th className="px-4 py-2 text-right">15% a repartir</th><th className="px-4 py-2"></th></tr>
@@ -575,7 +575,7 @@ function PestanaUtilidades({ puedeEditar }: { puedeEditar: boolean }) {
       </div>
 
       {detalle && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr><th className="px-4 py-2">Empleado</th><th className="px-4 py-2">Días trabajados</th><th className="px-4 py-2 text-right">10% días</th><th className="px-4 py-2 text-right">5% cargas</th><th className="px-4 py-2 text-right">Total</th></tr>
@@ -645,14 +645,14 @@ function PestanaLiquidaciones({ puedeEditar }: { puedeEditar: boolean }) {
             <option value="VISTO_BUENO">Visto bueno</option>
             <option value="OTRO">Otro</option>
           </select>
-          <button type="submit" disabled={calcular.isPending} className="col-span-3 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+          <button type="submit" disabled={calcular.isPending} className="col-span-3 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50">
             {calcular.isPending ? "Calculando..." : "Calcular liquidación"}
           </button>
           {calcular.isError && <p className="col-span-3 text-red-600 dark:text-red-400 text-sm">{(calcular.error as any)?.response?.data?.error}</p>}
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr><th className="px-4 py-2">Empleado</th><th className="px-4 py-2">Fecha salida</th><th className="px-4 py-2">Motivo</th><th className="px-4 py-2 text-right">Total</th><th className="px-4 py-2"></th></tr>
@@ -775,7 +775,7 @@ function PestanaMarcaciones({ puedeEditar }: { puedeEditar: boolean }) {
         <button
           onClick={exportarExcel}
           disabled={exportando || marcaciones?.length === 0}
-          className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+          className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
         >
           {exportando ? "Exportando..." : "Exportar a Excel"}
         </button>
@@ -818,7 +818,7 @@ function PestanaMarcaciones({ puedeEditar }: { puedeEditar: boolean }) {
           <button
             type="submit"
             disabled={registrarManual.isPending}
-            className="col-span-3 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-3 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {registrarManual.isPending ? "Guardando..." : "Registrar marcación manual (empleado olvidó marcar)"}
           </button>
@@ -830,7 +830,7 @@ function PestanaMarcaciones({ puedeEditar }: { puedeEditar: boolean }) {
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>

@@ -178,7 +178,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
   });
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-6">
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Buscador dinámico</h3>
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
         Escribe o dicta una consulta, ej. "{EJEMPLOS_BUSQUEDA[0]}". Reconoce un vocabulario fijo de frases — no está

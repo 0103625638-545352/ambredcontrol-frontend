@@ -6,6 +6,7 @@ import type {
   RetencionRecibida, RetencionRecibidaConDetalle, DevolucionCompra, DevolucionCompraConDetalle,
   PagoBancario,
 } from "../api/client";
+import { origenPagoTexto } from "../api/client";
 import { ReporteadorTabla, type ColumnaReporte } from "../components/ReporteadorTabla";
 import { DetalleDocumentoModal } from "../components/DetalleDocumentoModal";
 import { DetalleFilaModal } from "../components/DetalleFilaModal";
@@ -196,6 +197,7 @@ export function ReporteadorPrincipalPage({ esAdmin, puedeNotasCredito, puedeAudi
     { clave: "formaPago", etiqueta: "Forma de pago", obtenerValor: (p) => p.formaPago },
     { clave: "cuentaBancaria", etiqueta: "Cuenta bancaria", obtenerValor: (p) => cuentaBancariaTexto(p) },
     { clave: "referencia", etiqueta: "Referencia", obtenerValor: (p) => p.referencia },
+    { clave: "origenPago", etiqueta: "Origen del pago", obtenerValor: (p) => origenPagoTexto(p) },
     { clave: "monto", etiqueta: "Monto", formato: "moneda", obtenerValor: (p) => p.monto },
   ];
 
@@ -398,6 +400,7 @@ export function ReporteadorPrincipalPage({ esAdmin, puedeNotasCredito, puedeAudi
                 { etiqueta: "Forma de pago", obtenerValor: (f) => f.formaPago },
                 { etiqueta: "Cuenta bancaria", obtenerValor: (f) => cuentaBancariaTexto(f) },
                 { etiqueta: "Referencia", obtenerValor: (f) => f.referencia ?? "—" },
+                { etiqueta: "Origen del pago", obtenerValor: (f) => origenPagoTexto(f) ?? "—" },
                 { etiqueta: "Monto", obtenerValor: (f) => `$${f.monto}` },
               ],
             })

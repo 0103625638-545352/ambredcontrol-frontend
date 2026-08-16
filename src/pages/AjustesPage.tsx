@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, URL_BASE_API, type Sucursal } from "../api/client";
+import { api, URL_BASE_API, type Sucursal, type CodigosSri } from "../api/client";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
 import { MapaGeocerca } from "../components/MapaGeocerca";
@@ -24,6 +24,14 @@ interface DatosEmpresa {
   diaInicioCorte: number;
   diaFinCorte: number;
   tieneCertificado: boolean;
+}
+
+interface SecuencialInicial {
+  tipoComprobante: string;
+  etiqueta: string;
+  ultimoNumero: number;
+  totalDocumentos: number;
+  editable: boolean;
 }
 
 interface RespuestaBackupComprobantes {
@@ -244,11 +252,111 @@ export function AjustesPage() {
     );
   }
 
+  // --- Numeración inicial de comprobantes (go-live: continuar la
+  // numeración que el negocio ya tenía verificada por el SRI antes de usar
+  // este sistema) ---
+  const { data: secuenciales, isLoading: cargandoSecuenciales } = useQuery({
+    queryKey: ["configuracion-secuenciales"],
+    queryFn: async () => (await api.get<SecuencialInicial[]>("/configuracion/secuenciales")).data,
+  });
+  const [formSecuenciales, setFormSecuenciales] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (secuenciales) {
+      setFormSecuenciales(Object.fromEntries(secuenciales.map((s) => [s.tipoComprobante, String(s.ultimoNumero)])));
+    }
+  }, [secuenciales]);
+
+  const guardarSecuencial = useMutation({
+    mutationFn: async (tipoComprobante: string) =>
+      (
+        await api.put<SecuencialInicial>(`/configuracion/secuenciales/${tipoComprobante}`, {
+          ultimoNumero: Number(formSecuenciales[tipoComprobante]),
+        })
+      ).data,
+    onSuccess: (respuesta) => {
+      queryClient.invalidateQueries({ queryKey: ["configuracion-secuenciales"] });
+      mostrarToast(`${respuesta.etiqueta}: el próximo comprobante será el Nº ${respuesta.ultimoNumero + 1}`, "success");
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al guardar la numeración inicial");
+    },
+  });
+
+  async function confirmarGuardarSecuencial(tipoComprobante: string, etiqueta: string) {
+    const ok = await confirmar(
+      `El próximo ${etiqueta.toLowerCase()} emitido en este sistema será el Nº ${
+        Number(formSecuenciales[tipoComprobante] || 0) + 1
+      }. Verifica que coincida exactamente con lo que ya tienes autorizado por el SRI antes de continuar — ` +
+        "una vez que emitas el primero, este número ya no se puede volver a editar. ¿Guardar?"
+    );
+    if (ok) guardarSecuencial.mutate(tipoComprobante);
+  }
+
+  // --- Códigos SRI (tipo de identificación / forma de pago / % IVA) ---
+  // No es por empresa (ver GET /configuracion/codigos-sri) — un solo
+  // conjunto de códigos, editable acá para cuando el SRI actualiza alguna
+  // de estas tablas, sin tocar código ni volver a desplegar (ver el aviso
+  // rojo en la pantalla ATS).
+  const { data: codigosSri } = useQuery({
+    queryKey: ["configuracion-codigos-sri"],
+    queryFn: async () => (await api.get<CodigosSri>("/configuracion/codigos-sri")).data,
+  });
+  const [formTipoIdentificacion, setFormTipoIdentificacion] = useState<Record<string, string> | null>(null);
+  const [formFormaPago, setFormFormaPago] = useState<Record<string, string> | null>(null);
+  const [filasIva, setFilasIva] = useState<{ porcentaje: string; codigo: string }[]>([]);
+
+  useEffect(() => {
+    if (codigosSri) {
+      setFormTipoIdentificacion({ ...codigosSri.tipoIdentificacion });
+      setFormFormaPago({ ...codigosSri.formaPago });
+      setFilasIva(Object.entries(codigosSri.porcentajeIva).map(([porcentaje, codigo]) => ({ porcentaje, codigo })));
+    }
+  }, [codigosSri]);
+
+  const guardarCodigosSri = useMutation({
+    mutationFn: async () => {
+      const porcentajeIva: Record<string, string> = {};
+      for (const fila of filasIva) {
+        if (fila.porcentaje.trim()) porcentajeIva[fila.porcentaje.trim()] = fila.codigo.trim();
+      }
+      return (
+        await api.put<CodigosSri>("/configuracion/codigos-sri", {
+          tipoIdentificacion: formTipoIdentificacion,
+          formaPago: formFormaPago,
+          porcentajeIva,
+        })
+      ).data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["configuracion-codigos-sri"] });
+      mostrarToast("Códigos SRI actualizados", "success");
+    },
+    onError: (error: any) => {
+      mostrarToast(error.response?.data?.error ?? "Error al guardar los códigos SRI");
+    },
+  });
+
+  const ETIQUETAS_TIPO_IDENTIFICACION: Record<string, string> = {
+    RUC: "RUC",
+    CEDULA: "Cédula",
+    PASAPORTE: "Pasaporte",
+    CONSUMIDOR_FINAL: "Consumidor final",
+  };
+  const ETIQUETAS_FORMA_PAGO: Record<string, string> = {
+    EFECTIVO: "Efectivo",
+    TRANSFERENCIA: "Transferencia",
+    CHEQUE: "Cheque",
+    OTRO: "Otro",
+    TARJETA_DEBITO: "Tarjeta débito",
+    TARJETA_CREDITO: "Tarjeta crédito",
+  };
+
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Ajustes</h2>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Datos de la empresa</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           RUC, razón social y ambiente SRI usados al firmar y enviar facturas y notas de crédito.
@@ -412,7 +520,7 @@ export function AjustesPage() {
             <button
               type="submit"
               disabled={guardarEmpresa.isPending}
-              className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
             >
               {guardarEmpresa.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -420,7 +528,7 @@ export function AjustesPage() {
         )}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Certificado de firma electrónica</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           Archivo <code>.p12</code>/<code>.pfx</code> usado para firmar los comprobantes antes de enviarlos al
@@ -461,14 +569,14 @@ export function AjustesPage() {
           <button
             type="submit"
             disabled={!archivoCertificado || !passwordCertificado || subirCertificado.isPending}
-            className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {subirCertificado.isPending ? "Subiendo..." : "Subir certificado"}
           </button>
         </form>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Logo de la empresa</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           Aparece en la esquina superior izquierda del PDF (RIDE) de facturas y notas de crédito. Formatos
@@ -513,14 +621,14 @@ export function AjustesPage() {
           <button
             type="submit"
             disabled={!archivo || subirLogo.isPending}
-            className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {subirLogo.isPending ? "Subiendo..." : "Subir logo"}
           </button>
         </form>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Respaldo de comprobantes autorizados</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           El SRI exige conservar los XML autorizados varios años. Configura <code>BACKUP_COMPROBANTES_PATH</code> en
@@ -560,7 +668,7 @@ export function AjustesPage() {
         )}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Respaldo de base de datos</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           El propio sistema hace un respaldo (dump) diario de la base de datos. Configura{" "}
@@ -602,7 +710,7 @@ export function AjustesPage() {
         )}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Geocercas de sucursales</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           Ubicación y radio permitido para las marcaciones de entrada/salida de cada sucursal (ver la pestaña
@@ -659,7 +767,7 @@ export function AjustesPage() {
                     <button
                       onClick={() => guardarGeocerca.mutate(s.id)}
                       disabled={guardarGeocerca.isPending}
-                      className="ml-auto bg-emerald-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+                      className="ml-auto bg-brand-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
                     >
                       {guardarGeocerca.isPending ? "Guardando..." : "Guardar"}
                     </button>
@@ -668,6 +776,175 @@ export function AjustesPage() {
               );
             })}
           </div>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Numeración inicial</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Si el negocio ya emitía comprobantes (numeración verificada por el SRI) antes de usar este sistema,
+          ingresa acá el último número usado de cada tipo para que el primero que generes acá continúe esa
+          numeración, en vez de arrancar desde 1. Solo editable mientras no exista ningún comprobante de ese
+          tipo creado en este sistema.
+        </p>
+
+        {cargandoSecuenciales || !secuenciales ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        ) : (
+          <div className="space-y-3">
+            {secuenciales.map((s) => (
+              <div key={s.tipoComprobante} className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{s.etiqueta}</label>
+                  {s.editable ? (
+                    <input
+                      type="number"
+                      min={0}
+                      value={formSecuenciales[s.tipoComprobante] ?? ""}
+                      onChange={(e) => setFormSecuenciales({ ...formSecuenciales, [s.tipoComprobante]: e.target.value })}
+                      className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 px-3 py-1.5">
+                      {s.ultimoNumero} usado —{" "}
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {s.totalDocumentos} comprobante(s) ya emitido(s) acá, ya no editable
+                      </span>
+                    </p>
+                  )}
+                </div>
+                {s.editable && (
+                  <button
+                    type="button"
+                    onClick={() => confirmarGuardarSecuencial(s.tipoComprobante, s.etiqueta)}
+                    disabled={guardarSecuencial.isPending}
+                    className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    Guardar
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-2xl mt-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Códigos SRI</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Códigos de las tablas oficiales del SRI que se usan al armar el XML de facturas, notas de crédito, guías de
+          remisión y retenciones. El SRI las actualiza de tanto en tanto — si eso pasa, actualízalos acá (no hace
+          falta tocar código ni volver a desplegar).
+        </p>
+
+        {formTipoIdentificacion && formFormaPago ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              guardarCodigosSri.mutate();
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Tipo de identificación</p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.keys(formTipoIdentificacion).map((clave) => (
+                  <div key={clave}>
+                    <label className="block text-[10px] text-gray-500 dark:text-gray-400">
+                      {ETIQUETAS_TIPO_IDENTIFICACION[clave] ?? clave}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formTipoIdentificacion[clave]}
+                      onChange={(e) => setFormTipoIdentificacion({ ...formTipoIdentificacion, [clave]: e.target.value })}
+                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Forma de pago</p>
+              <div className="grid grid-cols-3 gap-2">
+                {Object.keys(formFormaPago).map((clave) => (
+                  <div key={clave}>
+                    <label className="block text-[10px] text-gray-500 dark:text-gray-400">{ETIQUETAS_FORMA_PAGO[clave] ?? clave}</label>
+                    <input
+                      type="text"
+                      required
+                      value={formFormaPago[clave]}
+                      onChange={(e) => setFormFormaPago({ ...formFormaPago, [clave]: e.target.value })}
+                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Porcentaje de IVA</p>
+                <button
+                  type="button"
+                  onClick={() => setFilasIva([...filasIva, { porcentaje: "", codigo: "" }])}
+                  className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
+                >
+                  + Agregar porcentaje
+                </button>
+              </div>
+              <div className="space-y-2">
+                {filasIva.map((fila, indice) => (
+                  <div key={indice} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-gray-500 dark:text-gray-400">% IVA</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej: 15"
+                        value={fila.porcentaje}
+                        onChange={(e) =>
+                          setFilasIva(filasIva.map((f, i) => (i === indice ? { ...f, porcentaje: e.target.value } : f)))
+                        }
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-gray-500 dark:text-gray-400">Código SRI</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej: 4"
+                        value={fila.codigo}
+                        onChange={(e) =>
+                          setFilasIva(filasIva.map((f, i) => (i === indice ? { ...f, codigo: e.target.value } : f)))
+                        }
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFilasIva(filasIva.filter((_, i) => i !== indice))}
+                      className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium mt-4"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={guardarCodigosSri.isPending}
+              className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            >
+              {guardarCodigosSri.isPending ? "Guardando..." : "Guardar códigos SRI"}
+            </button>
+          </form>
+        ) : (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
         )}
       </div>
 

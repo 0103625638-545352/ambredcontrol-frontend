@@ -184,7 +184,7 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
           type="button"
           onClick={() => crearAsiento.mutate()}
           disabled={!formularioValido || crearAsiento.isPending}
-          className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 mt-2"
+          className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40 mt-2"
         >
           {crearAsiento.isPending ? "Creando..." : "Crear asiento"}
         </button>

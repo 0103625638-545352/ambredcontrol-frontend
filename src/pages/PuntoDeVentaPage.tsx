@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Camera } from "lucide-react";
 import {
   api,
   abrirPdfEnNuevaPestana,
@@ -13,6 +14,7 @@ import {
 import { ImagenProducto } from "../components/ImagenProducto";
 import { BuscadorCliente } from "../components/BuscadorCliente";
 import { EscanerCodigoBarras } from "../components/EscanerCodigoBarras";
+import { SelectorBanco } from "../components/SelectorBanco";
 import { useToast } from "../components/ToastProvider";
 import { useMiSucursal } from "../context/AuthContext";
 
@@ -67,10 +69,28 @@ export function PuntoDeVentaPage() {
   const [cuentaBancariaId, setCuentaBancariaId] = useState<number | "">("");
   const [montoAbono, setMontoAbono] = useState("");
   const [montoRecibido, setMontoRecibido] = useState("");
+  const [referencia, setReferencia] = useState("");
+  // Datos de ORIGEN del pago (banco/cuenta/tarjeta/cheque de quien pagó) —
+  // mismo criterio que ModalRegistrarPago.tsx, cuáles se piden depende de
+  // formaPago (ver los bloques condicionales más abajo).
+  const [bancoOrigenId, setBancoOrigenId] = useState<number | "">("");
+  const [numeroCuentaOrigen, setNumeroCuentaOrigen] = useState("");
+  const [tarjetaUltimosDigitos, setTarjetaUltimosDigitos] = useState("");
+  const [tarjetaTipo, setTarjetaTipo] = useState("DEBITO");
+  const [tarjetaReferencia, setTarjetaReferencia] = useState("");
+  const [tarjetaLote, setTarjetaLote] = useState("");
+  const [chequeNumero, setChequeNumero] = useState("");
+  const [chequeFechaCobro, setChequeFechaCobro] = useState("");
   const [registrandoCobro, setRegistrandoCobro] = useState(false);
   // Solo tiene sentido si la venta queda con saldo pendiente (PARCIAL o
   // PENDIENTE) — una venta COMPLETO no tiene nada que vencer.
   const [fechaVencimiento, setFechaVencimiento] = useState("");
+  // Plan de cuotas (ver modelo Cuota) — solo dentro de PARCIAL, divide el
+  // saldo que queda DESPUÉS del abono en N partes iguales, cada una con su
+  // propia fecha. Se cobran estrictamente en orden (ver ModalRegistrarPago.tsx).
+  const [usarCuotas, setUsarCuotas] = useState(false);
+  const [numeroCuotas, setNumeroCuotas] = useState(2);
+  const [fechasCuotas, setFechasCuotas] = useState<string[]>(["", ""]);
 
   // Punto de Venta ya carga TODO el catálogo de una sola vez (lo necesita
   // para la grilla), así que filtramos aquí mismo, en el navegador, sin
@@ -219,11 +239,26 @@ export function PuntoDeVentaPage() {
   const mostrarCalculadoraEfectivo = modoCobro === "COMPLETO" && formaPago === "EFECTIVO";
   const vuelto = mostrarCalculadoraEfectivo && montoRecibido !== "" ? parseFloat(montoRecibido) - totalCarrito : null;
 
+  // Reparto en partes iguales del saldo que queda DESPUÉS del abono — la
+  // última cuota absorbe el centavo de redondeo que las demás no se llevan,
+  // para que la suma exacta siempre dé el saldo completo.
+  const saldoParaCuotas = Math.max(totalCarrito - (parseFloat(montoAbono) || 0), 0);
+  const cuotasCalculadas =
+    modoCobro === "PARCIAL" && usarCuotas && saldoParaCuotas > 0
+      ? Array.from({ length: numeroCuotas }, (_, i) => {
+          const montoBase = Math.floor((saldoParaCuotas / numeroCuotas) * 100) / 100;
+          const esUltima = i === numeroCuotas - 1;
+          const monto = esUltima ? Number((saldoParaCuotas - montoBase * (numeroCuotas - 1)).toFixed(2)) : montoBase;
+          return { numero: i + 1, monto, fechaVencimiento: fechasCuotas[i] || "" };
+        })
+      : [];
+  const cuotasValidas = !usarCuotas || (cuotasCalculadas.length > 0 && cuotasCalculadas.every((c) => c.fechaVencimiento !== ""));
+
   const cobroValido =
     (modoCobro === "PENDIENTE" ||
       (modoCobro === "COMPLETO" &&
         (formaPago !== "EFECTIVO" || (montoRecibido !== "" && parseFloat(montoRecibido) >= totalCarrito))) ||
-      (modoCobro === "PARCIAL" && montoAbono !== "" && parseFloat(montoAbono) > 0 && parseFloat(montoAbono) <= totalCarrito)) &&
+      (modoCobro === "PARCIAL" && montoAbono !== "" && parseFloat(montoAbono) > 0 && parseFloat(montoAbono) <= totalCarrito && cuotasValidas)) &&
     (modoCobro === "PENDIENTE" || !exigeCuentaBancaria || cuentaBancariaId !== "");
 
   const crearVenta = useMutation({
@@ -235,6 +270,19 @@ export function PuntoDeVentaPage() {
         items: carrito.map((item) => ({ productoId: item.producto.id, cantidad: item.cantidad })),
         ...(tipoComprobante === "NOTA_VENTA" ? { aplicaIva: aplicaIvaNotaVenta } : {}),
         ...(modoCobro !== "COMPLETO" && fechaVencimiento ? { fechaVencimiento } : {}),
+        // OJO: el plan de cuotas NO va acá — va en el registro del abono
+        // inicial (ver confirmarVentaConCobro), porque tiene que crearse
+        // DESPUÉS de aplicar ese abono. Si se creara junto con la venta, el
+        // abono (que llega en la llamada siguiente) chocaría con la cuota 1
+        // ya pendiente y el backend lo rechazaría por no coincidir el monto.
+        //
+        // formaPago/tarjetaTipo SÍ van acá (solo para Factura, que es la
+        // única que se manda al SRI) — es la forma de pago elegida en
+        // pantalla AL MOMENTO de confirmar, para que el XML declare el
+        // método real en vez de "efectivo" por default (ver
+        // codigoFormaPagoSri en el backend). No crea ningún Pago por sí
+        // sola, eso lo sigue haciendo la llamada de abajo.
+        ...(tipoComprobante === "FACTURA" && modoCobro !== "PENDIENTE" ? { formaPago, tarjetaTipo } : {}),
       });
     },
   });
@@ -264,6 +312,19 @@ export function PuntoDeVentaPage() {
           monto,
           formaPago,
           cuentaBancariaId: exigeCuentaBancaria ? cuentaBancariaId : undefined,
+          referencia: referencia || undefined,
+          bancoOrigenId: exigeCuentaBancaria ? bancoOrigenId || undefined : undefined,
+          numeroCuentaOrigen: formaPago === "TRANSFERENCIA" ? numeroCuentaOrigen || undefined : undefined,
+          tarjetaUltimosDigitos: formaPago === "TARJETA" ? tarjetaUltimosDigitos || undefined : undefined,
+          tarjetaTipo: formaPago === "TARJETA" ? tarjetaTipo : undefined,
+          tarjetaReferencia: formaPago === "TARJETA" ? tarjetaReferencia || undefined : undefined,
+          tarjetaLote: formaPago === "TARJETA" ? tarjetaLote || undefined : undefined,
+          chequeNumero: formaPago === "CHEQUE" ? chequeNumero || undefined : undefined,
+          chequeFechaCobro: formaPago === "CHEQUE" ? chequeFechaCobro || undefined : undefined,
+          // El plan de cuotas se crea junto con ESTE pago (el abono
+          // inicial), nunca junto con la venta — ver el comentario en
+          // crearVenta más arriba.
+          ...(modoCobro === "PARCIAL" && usarCuotas && cuotasCalculadas.length > 0 ? { cuotas: cuotasCalculadas } : {}),
         });
       } catch (error: any) {
         mostrarToast(
@@ -291,6 +352,18 @@ export function PuntoDeVentaPage() {
     setMontoAbono("");
     setMontoRecibido("");
     setFechaVencimiento("");
+    setReferencia("");
+    setBancoOrigenId("");
+    setNumeroCuentaOrigen("");
+    setTarjetaUltimosDigitos("");
+    setTarjetaTipo("DEBITO");
+    setTarjetaReferencia("");
+    setTarjetaLote("");
+    setChequeNumero("");
+    setChequeFechaCobro("");
+    setUsarCuotas(false);
+    setNumeroCuotas(2);
+    setFechasCuotas(["", ""]);
     // El stock y las cuentas por cobrar cambiaron, así que invalidamos esas consultas.
     queryClient.invalidateQueries({ queryKey: ["productos"] });
     queryClient.invalidateQueries({ queryKey: ["facturas"] });
@@ -305,7 +378,7 @@ export function PuntoDeVentaPage() {
     const rutaPdf = esFactura ? `${base}/ride` : `${base}/recibo`;
     const rutaTermico = `${base}/recibo-termico`;
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 max-w-md mx-auto text-center">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-8 max-w-md mx-auto text-center">
         <div className="text-emerald-600 dark:text-emerald-400 text-4xl mb-2">✓</div>
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Venta registrada</h2>
         <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
@@ -339,7 +412,7 @@ export function PuntoDeVentaPage() {
   return (
     <div className="grid grid-cols-3 gap-4">
       {/* Columna izquierda: lista de productos para agregar */}
-      <div className="col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+      <div className="col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-3">Productos</h2>
         <div className="flex gap-2 mb-3">
           <input
@@ -357,10 +430,7 @@ export function PuntoDeVentaPage() {
             title="Escanear con la cámara"
             className="shrink-0 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md px-3 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
-              <circle cx="12" cy="13" r="4" />
-            </svg>
+            <Camera strokeWidth={1.75} className="w-5 h-5" />
           </button>
         </div>
         {productosFiltrados?.length === 0 && (
@@ -387,7 +457,7 @@ export function PuntoDeVentaPage() {
       </div>
 
       {/* Columna derecha: carrito */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex flex-col">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Carrito</h2>
         <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
           {miSucursal ? `Vendiendo desde: ${miSucursal.nombre}` : "Tu usuario no tiene sucursal asignada"}
@@ -527,6 +597,13 @@ export function PuntoDeVentaPage() {
                 onChange={(e) => {
                   setFormaPago(e.target.value);
                   setCuentaBancariaId("");
+                  setBancoOrigenId("");
+                  setNumeroCuentaOrigen("");
+                  setTarjetaUltimosDigitos("");
+                  setTarjetaReferencia("");
+                  setTarjetaLote("");
+                  setChequeNumero("");
+                  setChequeFechaCobro("");
                 }}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
               >
@@ -560,17 +637,155 @@ export function PuntoDeVentaPage() {
                   </select>
                 ))}
 
-              {modoCobro === "PARCIAL" && (
+              {formaPago === "TRANSFERENCIA" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco de procedencia" />
+                  <input
+                    type="text"
+                    placeholder="N° de cuenta de origen"
+                    value={numeroCuentaOrigen}
+                    onChange={(e) => setNumeroCuentaOrigen(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                  />
+                </div>
+              )}
+              {formaPago === "TARJETA" && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={4}
+                        placeholder="Últimos 4 dígitos"
+                        value={tarjetaUltimosDigitos}
+                        onChange={(e) => setTarjetaUltimosDigitos(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                      />
+                      <select
+                        value={tarjetaTipo}
+                        onChange={(e) => setTarjetaTipo(e.target.value)}
+                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                      >
+                        <option value="DEBITO">Débito</option>
+                        <option value="CREDITO">Crédito</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="N° de referencia"
+                      value={tarjetaReferencia}
+                      onChange={(e) => setTarjetaReferencia(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="N° de lote"
+                      value={tarjetaLote}
+                      onChange={(e) => setTarjetaLote(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+              {formaPago === "CHEQUE" && (
+                <div className="grid grid-cols-3 gap-2">
+                  <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
+                  <input
+                    type="text"
+                    placeholder="N° de cheque"
+                    value={chequeNumero}
+                    onChange={(e) => setChequeNumero(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                  />
+                  <input
+                    type="date"
+                    title="Fecha de cobro del cheque"
+                    value={chequeFechaCobro}
+                    onChange={(e) => setChequeFechaCobro(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                  />
+                </div>
+              )}
+              {exigeCuentaBancaria && (
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max={totalCarrito || undefined}
-                  placeholder={`Monto del abono (máx. $${totalCarrito.toFixed(2)})`}
-                  value={montoAbono}
-                  onChange={(e) => setMontoAbono(e.target.value)}
+                  type="text"
+                  placeholder="Referencia (opcional)"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
                   className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
                 />
+              )}
+
+              {modoCobro === "PARCIAL" && (
+                <>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={totalCarrito || undefined}
+                    placeholder={`Monto del abono (máx. $${totalCarrito.toFixed(2)})`}
+                    value={montoAbono}
+                    onChange={(e) => setMontoAbono(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                  />
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-md p-2 space-y-2">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={usarCuotas}
+                        onChange={(e) => setUsarCuotas(e.target.checked)}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      Dividir el saldo restante en cuotas
+                    </label>
+                    {usarCuotas && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-500 dark:text-gray-400 shrink-0">N° de cuotas</label>
+                          <select
+                            value={numeroCuotas}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              setNumeroCuotas(n);
+                              setFechasCuotas((actual) => Array.from({ length: n }, (_, i) => actual[i] ?? ""));
+                            }}
+                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                              <option key={n} value={n}>
+                                {n}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
+                            Saldo a repartir: ${saldoParaCuotas.toFixed(2)}
+                          </span>
+                        </div>
+                        {cuotasCalculadas.map((c, i) => (
+                          <div key={c.numero} className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 w-16 shrink-0">Cuota {c.numero}</span>
+                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-16 shrink-0">
+                              ${c.monto.toFixed(2)}
+                            </span>
+                            <input
+                              type="date"
+                              required
+                              value={fechasCuotas[i] || ""}
+                              onChange={(e) =>
+                                setFechasCuotas((actual) => actual.map((f, idx) => (idx === i ? e.target.value : f)))
+                              }
+                              className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                            />
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </>
               )}
 
               {mostrarCalculadoraEfectivo && (
@@ -611,7 +826,7 @@ export function PuntoDeVentaPage() {
           <button
             onClick={confirmarVentaConCobro}
             disabled={carrito.length === 0 || !clienteId || !bodegaId || crearVenta.isPending || registrandoCobro || !cobroValido}
-            className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+            className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
           >
             {crearVenta.isPending || registrandoCobro
               ? "Procesando..."

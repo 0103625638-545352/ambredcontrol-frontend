@@ -43,7 +43,7 @@ export function DiccionarioBuscador() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5 max-w-lg mt-4">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Diccionario del buscador</h3>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
         Palabras adicionales que el "Buscador dinámico" de Reportes reconoce, más allá de las que ya trae de fábrica
@@ -85,7 +85,7 @@ export function DiccionarioBuscador() {
         <button
           type="submit"
           disabled={agregar.isPending || !palabra.trim()}
-          className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
         >
           {agregar.isPending ? "Agregando..." : "Agregar"}
         </button>

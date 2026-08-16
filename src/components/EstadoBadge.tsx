@@ -20,7 +20,7 @@ const coloresEstado: Record<string, string> = {
 
 export function EstadoBadge({ estado }: { estado: string }) {
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${coloresEstado[estado] ?? "bg-gray-100"}`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${coloresEstado[estado] ?? "bg-gray-100"}`}>
       {estado}
     </span>
   );

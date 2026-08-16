@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { Camera } from "lucide-react";
 import { api, abrirPdfEnNuevaPestana, type Producto, type Categoria, type TipoPrecio, type Bodega, type RespuestaPaginada } from "../api/client";
 import { usePermiso, useMiSucursal } from "../context/AuthContext";
 import { Paginacion } from "../components/Paginacion";
@@ -20,12 +21,7 @@ const TAMANOS_ETIQUETA = [
 ];
 
 function IconoCamara() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
-      <circle cx="12" cy="13" r="4" />
-    </svg>
-  );
+  return <Camera strokeWidth={1.75} className="w-4 h-4" />;
 }
 
 export function ProductosPage() {
@@ -455,7 +451,7 @@ export function ProductosPage() {
           <button
             type="submit"
             disabled={crearProducto.isPending || (!form.manejaLotes && parseInt(form.stockActual, 10) > 0 && !form.bodegaId)}
-            className="col-span-2 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearProducto.isPending ? "Guardando..." : "Guardar producto"}
           </button>
@@ -467,7 +463,7 @@ export function ProductosPage() {
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>
@@ -878,7 +874,7 @@ export function ProductosPage() {
                         <button
                           type="submit"
                           disabled={registrarEntrada.isPending || (!p.manejaLotes && !entradaForm.bodegaId)}
-                          className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                          className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
                         >
                           {registrarEntrada.isPending ? "Guardando..." : "Confirmar entrada"}
                         </button>

@@ -101,13 +101,13 @@ export function TiposPrecioPage() {
         <button
           type="submit"
           disabled={crearTipoPrecio.isPending}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 whitespace-nowrap"
+          className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50 whitespace-nowrap"
         >
           {crearTipoPrecio.isPending ? "Guardando..." : "+ Agregar"}
         </button>
       </form>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden max-w-2xl">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden max-w-2xl">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>

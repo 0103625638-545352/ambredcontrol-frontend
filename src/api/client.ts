@@ -189,6 +189,17 @@ export interface CuentaBancaria {
   createdAt?: string;
 }
 
+// Catálogo de bancos EXTERNOS (Pichincha, Guayaquil, Produbanco, etc.) — de
+// dónde vino/salió el dinero de un Pago (bancoOrigenId), NO las cuentas
+// PROPIAS de la empresa (eso es CuentaBancaria arriba). Se elige de una
+// lista al registrar un cobro/pago en vez de escribir el nombre a mano.
+export interface Banco {
+  id: number;
+  nombre: string;
+  activo?: boolean;
+  createdAt?: string;
+}
+
 // Caja registradora física DENTRO de una sucursal (ver PuntoDeVenta en
 // schema.prisma). A diferencia de Bodega, es opcional y nunca se elige a
 // mano en una venta/compra — se hereda sola de la caja abierta de quien
@@ -469,6 +480,23 @@ export interface Pago {
   // presente si se subió una imagen al registrar el pago (hoy, únicamente
   // desde la ventana de pago de Facturación de Internet). Ver urlComprobantePago().
   comprobanteUrl?: string | null;
+  // Datos de ORIGEN del pago (banco/cuenta/tarjeta de quien pagó) — distintos
+  // de cuentaBancaria arriba (la cuenta PROPIA de la empresa). Todos
+  // opcionales; cuáles aplican depende de formaPago, ver ModalRegistrarPago.tsx.
+  // bancoOrigen es del catálogo Banco (no texto libre), ver ese tipo arriba.
+  bancoOrigenId?: number | null;
+  bancoOrigen?: { id: number; nombre: string } | null;
+  numeroCuentaOrigen?: string | null;
+  tarjetaUltimosDigitos?: string | null;
+  tarjetaTipo?: string | null; // "CREDITO" | "DEBITO"
+  tarjetaReferencia?: string | null; // N° de referencia que imprime el datafono
+  tarjetaLote?: string | null; // N° de lote de la transacción
+  chequeNumero?: string | null;
+  chequeFechaCobro?: string | null;
+  // Si este pago liquidó una Cuota de un plan a plazos (ver modelo Cuota),
+  // acá viene su número — solo el número, el resto del detalle de la cuota
+  // vive en Factura/NotaVenta/Compra.cuotas (ver GET /:id de cada una).
+  cuota?: { numero: number } | null;
 }
 
 // Mismo criterio que urlImagenProducto(): comprobanteUrl es una ruta
@@ -476,6 +504,22 @@ export interface Pago {
 // <img src> o un enlace "Ver comprobante".
 export function urlComprobantePago(pago: Pago): string | null {
   return pago.comprobanteUrl ? `${URL_BASE_API}${pago.comprobanteUrl}` : null;
+}
+
+// Arma un resumen de una línea de los datos de ORIGEN del pago (banco/cuenta/
+// tarjeta/cheque de quien pagó) para mostrar en el historial y el
+// Reporteador — qué campos aplican depende de formaPago, ver el modelo Pago.
+export function origenPagoTexto(pago: Pago): string | null {
+  const partes: string[] = [];
+  if (pago.bancoOrigen) partes.push(pago.bancoOrigen.nombre);
+  if (pago.numeroCuentaOrigen) partes.push(`cta. ${pago.numeroCuentaOrigen}`);
+  if (pago.tarjetaTipo) partes.push(pago.tarjetaTipo === "CREDITO" ? "crédito" : "débito");
+  if (pago.tarjetaUltimosDigitos) partes.push(`•••• ${pago.tarjetaUltimosDigitos}`);
+  if (pago.tarjetaReferencia) partes.push(`ref. ${pago.tarjetaReferencia}`);
+  if (pago.tarjetaLote) partes.push(`lote ${pago.tarjetaLote}`);
+  if (pago.chequeNumero) partes.push(`cheque N° ${pago.chequeNumero}`);
+  if (pago.chequeFechaCobro) partes.push(`cobrable ${new Date(pago.chequeFechaCobro).toLocaleDateString("es-EC")}`);
+  return partes.length > 0 ? partes.join(" — ") : null;
 }
 
 // Fila de GET /pagos/bancarios (Reporteador Principal) — un Pago con
@@ -494,6 +538,18 @@ export interface PagoBancario extends Pago {
   compra?: { numeroFactura: string; proveedor: { razonSocial: string } } | null;
 }
 
+// Una cuota de un plan de pago a plazos (ver modelo Cuota en schema.prisma)
+// — a diferencia de un abono libre, se cobra ESTRICTAMENTE EN ORDEN y por su
+// monto EXACTO (ver ModalRegistrarPago.tsx). Solo presente en el detalle de
+// una Factura/NotaVenta (GET /:id), no en el listado.
+export interface Cuota {
+  id: number;
+  numero: number;
+  monto: string;
+  fechaVencimiento: string;
+  estado: "PENDIENTE" | "PAGADA";
+}
+
 export interface Factura {
   id: number;
   secuencial: string;
@@ -506,6 +562,7 @@ export interface Factura {
   fechaVencimiento?: string | null;
   cliente: Cliente;
   retencionRecibida: { id: number; numeroComprobante: string; total: string } | null;
+  cuotas?: Cuota[];
 }
 
 // Lo que devuelve GET /dashboard/resumen para pintar la pantalla de inicio.
@@ -655,6 +712,7 @@ export interface NotaVenta {
   fechaEmision: string;
   fechaVencimiento?: string | null;
   cliente: Cliente;
+  cuotas?: Cuota[];
 }
 
 export interface NotaVentaDetalle {
@@ -733,6 +791,8 @@ export interface Compra {
   montoPagado: string;
   proveedor: Proveedor;
   retencion: RetencionResumen | null;
+  cuotas?: Cuota[];
+  sustentoTributario?: string | null; // código de la tabla "Sustento Tributario" del SRI
 }
 
 export interface CompraDetalle {
@@ -1025,10 +1085,15 @@ export interface VisitaHistorialCliente {
   rutaVisitaId: number;
   nombreContacto: string;
   direccion: string | null;
+  latitud: string;
+  longitud: string;
   orden: number;
   esUrgente: boolean;
   estado: "PENDIENTE" | "COMPLETADA" | "OMITIDA";
   fechaLlegadaReal: string | null;
+  latitudLlegada: string | null;
+  longitudLlegada: string | null;
+  distanciaAlPunto: string | null;
   observaciones: string | null;
   descripcionTrabajo: string | null;
   fotoTrabajoUrl: string | null;
@@ -1047,9 +1112,15 @@ export interface VisitaHistorialTecnico {
   cliente: Cliente | null;
   nombreContacto: string;
   direccion: string | null;
+  latitud: string;
+  longitud: string;
   orden: number;
   esUrgente: boolean;
   estado: "PENDIENTE" | "COMPLETADA" | "OMITIDA";
+  fechaLlegadaReal: string | null;
+  latitudLlegada: string | null;
+  longitudLlegada: string | null;
+  distanciaAlPunto: string | null;
   descripcionTrabajo: string | null;
   fotoTrabajoUrl: string | null;
   fotoViviendaUrl: string | null;
@@ -1298,6 +1369,129 @@ export interface CuentasPorCobrar {
   }[];
 }
 
+// Control de proximidad de cobro por CUOTA individual (ver
+// GET /reportes/cuotas-por-cobrar) — a diferencia de CuentasPorCobrar (por
+// documento completo), acá cada cuota de un plan a plazos aparece por
+// separado con su propia fecha, para ver exactamente cuál vence primero.
+export interface CuotasPorCobrar {
+  resumen: { cantidadCuotas: number; totalPorCobrar: string; vencidas: number };
+  cuotas: {
+    id: number;
+    numero: number;
+    monto: string;
+    fechaVencimiento: string;
+    diasParaVencer: number | null;
+    diasAtraso: number | null;
+    tipo: "FACTURA" | "NOTA_VENTA";
+    documentoId: number;
+    secuencial: string;
+    cliente: string;
+  }[];
+}
+
+// El reverso de CuotasPorCobrar: control de proximidad de PAGO por CUOTA
+// individual de un plan a plazos con un proveedor (ver
+// GET /reportes/cuotas-por-pagar).
+export interface CuotasPorPagar {
+  resumen: { cantidadCuotas: number; totalPorPagar: string; vencidas: number };
+  cuotas: {
+    id: number;
+    numero: number;
+    monto: string;
+    fechaVencimiento: string;
+    diasParaVencer: number | null;
+    diasAtraso: number | null;
+    compraId: number;
+    numeroFactura: string;
+    proveedor: string;
+  }[];
+}
+
+// Insumo para el Anexo Transaccional Simplificado (ATS) mensual (ver
+// GET /reportes/ats) — NO es el XML oficial que exige el SRI (ver el
+// comentario de esa ruta en el backend), es el detalle por comprobante para
+// revisar y cargar a mano al DIMM Formularios. sustentoTributario siempre
+// llega null: ese código todavía no se captura al registrar una compra.
+export interface ReporteAts {
+  periodo: { anio: number; mes: number };
+  resumen: {
+    cantidadVentas: number;
+    cantidadNotasCredito: number;
+    cantidadCompras: number;
+    cantidadRetencionesEmitidas: number;
+    cantidadRetencionesRecibidas: number;
+    cantidadAnulados: number;
+    totalVentas: string;
+    totalCompras: string;
+    totalRetencionesEmitidas: string;
+    totalRetencionesRecibidas: string;
+  };
+  ventas: {
+    tipo: "FACTURA" | "NOTA_VENTA";
+    fecha: string;
+    comprobante: string;
+    claveAcceso: string | null;
+    identificacion: string;
+    tipoIdentificacion: string;
+    razonSocial: string;
+    base0: string;
+    base12: string;
+    iva: string;
+    total: string;
+  }[];
+  notasCredito: {
+    fecha: string;
+    comprobante: string;
+    claveAcceso: string | null;
+    facturaModificada: string;
+    identificacion: string;
+    tipoIdentificacion: string;
+    razonSocial: string;
+    base0: string;
+    base12: string;
+    iva: string;
+    total: string;
+  }[];
+  compras: {
+    fecha: string;
+    comprobante: string;
+    identificacion: string;
+    tipoIdentificacion: string;
+    razonSocial: string;
+    base0: string;
+    base12: string;
+    iva: string;
+    total: string;
+    sustentoTributario: string | null;
+  }[];
+  retencionesEmitidas: {
+    fecha: string;
+    comprobante: string;
+    claveAcceso: string | null;
+    compraNumeroFactura: string;
+    identificacion: string;
+    tipoIdentificacion: string;
+    razonSocial: string;
+    totalIva: string;
+    totalRenta: string;
+    total: string;
+    detalles: { tipoImpuesto: string; codigoRetencion: string; baseImponible: string; porcentaje: string; valorRetenido: string }[];
+  }[];
+  retencionesRecibidas: {
+    fecha: string;
+    comprobante: string;
+    facturaSecuencial: string;
+    identificacion: string;
+    tipoIdentificacion: string;
+    razonSocial: string;
+    totalIva: string;
+    totalRenta: string;
+    total: string;
+    detalles: { tipoImpuesto: string; codigoRetencion: string; baseImponible: string; porcentaje: string; valorRetenido: string }[];
+  }[];
+  anulados: { tipo: "FACTURA" | "NOTA_CREDITO"; comprobante: string; fecha: string; claveAcceso: string | null }[];
+}
+
 // Una entrada de la bitácora de auditoría: quién hizo qué acción sensible
 // (anular, editar, desactivar, eliminar pago) y cuándo. Solo un ADMIN puede
 // consultarla (ver GET /auditoria).
@@ -1403,4 +1597,15 @@ export interface CuentasPorPagar {
     montoPagado: string;
     saldo: string;
   }[];
+}
+
+// Códigos de las tablas oficiales del SRI (tipo de identificación,
+// porcentaje de IVA, forma de pago) que la app necesita para armar el XML
+// de los comprobantes electrónicos — editables desde Ajustes > Códigos SRI
+// para cuando el SRI los actualiza, sin tocar código (ver
+// GET/PUT /configuracion/codigos-sri).
+export interface CodigosSri {
+  tipoIdentificacion: Record<string, string>;
+  formaPago: Record<string, string>;
+  porcentajeIva: Record<string, string>;
 }

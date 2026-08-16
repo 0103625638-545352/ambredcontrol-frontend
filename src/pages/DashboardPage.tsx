@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AlertTriangle, Clock, AlertCircle, ShieldAlert, DatabaseBackup, FileText, TrendingUp, ClipboardList } from "lucide-react";
 import { api, type DashboardResumen } from "../api/client";
 import { EstadoBadge } from "../components/EstadoBadge";
 
@@ -94,9 +95,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           fijarse), ahora salta apenas se abre el Dashboard. */}
       {puedeProductos && data && data.productosStockBajo.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-          </svg>
+          <AlertTriangle strokeWidth={1.75} className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
               {data.productosStockBajo.length === 1
@@ -124,9 +123,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           única) que ya caducaron o caducan dentro de los próximos 30 días. */}
       {puedeProductos && data && data.productosPorCaducar.length > 0 && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
+          <Clock strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
               {data.productosPorCaducar.length === 1
@@ -159,9 +156,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           puede firmarse hasta que se solucione). Se muestra primero. */}
       {data?.certificadoInvalido && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
+          <AlertCircle strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
               El certificado de firma electrónica no se puede usar
@@ -185,9 +180,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           corta la facturación electrónica sin ningún aviso previo. */}
       {data?.certificadoPorCaducar && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
+          <ShieldAlert strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
               {data.certificadoPorCaducar.vencido
@@ -215,9 +208,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           hasta que hace falta restaurar. */}
       {data?.backupAtrasado && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v6a8 8 0 0 0 16 0V7M4 7a8 3 0 0 0 16 0M4 7a8 3 0 0 1 16 0" />
-          </svg>
+          <DatabaseBackup strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
               El respaldo automático de la base de datos está atrasado
@@ -241,11 +232,9 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
       {puedeVentas && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         {/* Documentos electrónicos: accesos rápidos a Facturas y Notas de Venta */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5 text-gray-500 dark:text-gray-400">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6M9 8h6M5 21h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2Z" />
-            </svg>
+            <FileText strokeWidth={1.75} className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             Documentos Electrónicos
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -253,10 +242,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
               onClick={() => onNavegar("facturas")}
               className="text-left bg-gradient-to-br from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white rounded-lg p-4 h-32 flex flex-col justify-between transition-colors"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 opacity-80">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 2l1.5 1.5L9 2l1.5 1.5L12 2l1.5 1.5L15 2l1.5 1.5L18 2v20l-1.5-1.5L15 22l-1.5-1.5L12 22l-1.5-1.5L9 22l-1.5-1.5L6 22V2Z" />
-                <path strokeLinecap="round" d="M9 8h6M9 12h6M9 16h4" />
-              </svg>
+              <FileText strokeWidth={1.5} className="w-8 h-8 opacity-80" />
               <div>
                 <p className="font-semibold">Facturas</p>
                 <p className="text-xs text-sky-100">Ver más →</p>
@@ -266,9 +252,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
               onClick={() => onNavegar("notasVenta")}
               className="text-left bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg p-4 h-32 flex flex-col justify-between transition-colors"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 opacity-80">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 15l4-4 3 3 5-6" />
-              </svg>
+              <TrendingUp strokeWidth={1.5} className="w-8 h-8 opacity-80" />
               <div>
                 <p className="font-semibold">Notas de Venta</p>
                 <p className="text-xs text-emerald-100">Ver más →</p>
@@ -278,12 +262,9 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
         </div>
 
         {/* Resumen del mes en curso */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="w-5 h-5 text-gray-500 dark:text-gray-400">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 19V5a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14 3v6h6" />
-            </svg>
+            <ClipboardList strokeWidth={1.75} className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             Resumen del mes
           </h2>
           {isLoading || !data ? (
@@ -323,7 +304,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
         {/* Tendencia de ventas: una sola serie (facturas + notas de venta
             combinadas), por eso no lleva leyenda — el título ya dice qué se
             grafica. Los días sin ventas quedan en $0, no se ocultan. */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Tendencia de ventas</h2>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Últimos 14 días · incluye facturas y notas de venta</p>
           {data && data.ventasUltimosDias.length > 0 ? (
@@ -358,7 +339,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
 
         {/* Top 5 productos del mes: barra horizontal para que los nombres
             (variables en longitud) no compitan por espacio con el eje. */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Productos más vendidos</h2>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Mes en curso · por unidades</p>
           {data && data.topProductosMes.length > 0 ? (
@@ -395,7 +376,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
 
       {/* Facturas recientes */}
       {puedeVentas && (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 px-4 pt-4 pb-2">Facturas recientes</h2>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
@@ -445,7 +426,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           (facturas + notas de venta), solo tiene sentido si hay más de una
           sucursal activa. */}
       {puedeVentas && data && data.ventasPorSucursal.length > 1 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 px-4 pt-4 pb-2">Ventas por sucursal (mes en curso)</h2>
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">

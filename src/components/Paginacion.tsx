@@ -2,6 +2,7 @@
 // de página. Pensado para ir como pie de una tabla (mismo borde superior que
 // separa las filas). Se usa junto con las rutas que devuelven
 // RespuestaPaginada<T> (ver api/client.ts).
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Props {
   page: number;
@@ -23,16 +24,18 @@ export function Paginacion({ page, totalPaginas, total, onCambiarPagina }: Props
         <button
           onClick={() => onCambiarPagina(page - 1)}
           disabled={page <= 1}
-          className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
         >
+          <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2} />
           Anterior
         </button>
         <button
           onClick={() => onCambiarPagina(page + 1)}
           disabled={page >= totalPaginas}
-          className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
         >
           Siguiente
+          <ChevronRight className="w-3.5 h-3.5" strokeWidth={2} />
         </button>
       </div>
     </div>

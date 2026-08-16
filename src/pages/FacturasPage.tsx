@@ -77,7 +77,7 @@ export function FacturasPage({ onIrANotaCredito }: Props) {
     <div>
       <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Facturas emitidas</h2>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { urlArchivoSubido, type EquipoDejadoVisita } from "../api/client";
+import { MapaVisita } from "./MapaVisita";
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   PENDIENTE: "Pendiente",
@@ -13,11 +14,24 @@ const CLASE_ESTADO: Record<string, string> = {
   OMITIDA: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
 };
 
+// Qué tan lejos del punto planeado puede quedar la llegada real y todavía
+// contar como "llegó ahí" — igual de generoso que una geocerca de sucursal
+// (ver utils/geocercas.ts en el backend), y a propósito no más estricto:
+// acá el punto planeado en sí ya tiene su propio margen de error (ubicado a
+// mano por el despachador desde un mensaje de WhatsApp, no geocodificado),
+// sumado a la precisión típica de 10-50m del GPS de un celular.
+const RADIO_VISITA_PERMITIDO_METROS = 150;
+
 interface VisitaParaTarjeta {
   id: number;
   estado: "PENDIENTE" | "COMPLETADA" | "OMITIDA";
   esUrgente?: boolean;
   direccion: string | null;
+  latitud?: string;
+  longitud?: string;
+  latitudLlegada?: string | null;
+  longitudLlegada?: string | null;
+  distanciaAlPunto?: string | null;
   descripcionTrabajo?: string | null;
   fotoTrabajoUrl?: string | null;
   fotoViviendaUrl?: string | null;
@@ -33,6 +47,11 @@ interface VisitaParaTarjeta {
 // children en vez de armarse adentro.
 export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaParaTarjeta; encabezado: ReactNode }) {
   const equipos = visita.equiposDejados ?? [];
+
+  const tieneUbicacionPlaneada = visita.latitud != null && visita.longitud != null;
+  const distancia = visita.distanciaAlPunto != null ? Number(visita.distanciaAlPunto) : null;
+  const dentroDeRango = distancia != null ? distancia <= RADIO_VISITA_PERMITIDO_METROS : null;
+
   return (
     <div
       className={`border rounded-md p-3 ${
@@ -51,6 +70,40 @@ export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaPar
           {ETIQUETA_ESTADO[visita.estado]}
         </span>
       </div>
+
+      {visita.estado === "COMPLETADA" && (
+        <p
+          className={`text-xs font-medium mt-1 ${
+            dentroDeRango === true
+              ? "text-emerald-600 dark:text-emerald-400"
+              : dentroDeRango === false
+                ? "text-red-600 dark:text-red-400"
+                : "text-gray-400 dark:text-gray-500"
+          }`}
+        >
+          {dentroDeRango === true && `✓ Llegó dentro del rango permitido (${distancia!.toFixed(0)} m del punto planeado)`}
+          {dentroDeRango === false && `⚠ Llegó FUERA del rango permitido (${distancia!.toFixed(0)} m del punto planeado)`}
+          {dentroDeRango === null && "Sin ubicación de llegada registrada"}
+        </p>
+      )}
+      {visita.estado !== "COMPLETADA" && (
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mt-1">
+          {visita.estado === "OMITIDA" ? "No llegó — visita omitida" : "No ha llegado todavía"}
+        </p>
+      )}
+
+      {tieneUbicacionPlaneada && (
+        <div className="mt-2">
+          <MapaVisita
+            latitudPlaneada={Number(visita.latitud)}
+            longitudPlaneada={Number(visita.longitud)}
+            radioPermitidoMetros={RADIO_VISITA_PERMITIDO_METROS}
+            latitudLlegada={visita.latitudLlegada != null ? Number(visita.latitudLlegada) : null}
+            longitudLlegada={visita.longitudLlegada != null ? Number(visita.longitudLlegada) : null}
+            dentroDeRango={dentroDeRango}
+          />
+        </div>
+      )}
 
       {visita.descripcionTrabajo && (
         <p className="text-xs text-gray-600 dark:text-gray-300 mt-2">

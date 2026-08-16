@@ -315,7 +315,7 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
             type="button"
             onClick={() => generarGuia.mutate()}
             disabled={!formularioValido || generarGuia.isPending}
-            className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+            className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
           >
             {generarGuia.isPending ? "Generando..." : "Generar guía de remisión"}
           </button>

@@ -145,7 +145,7 @@ export function ProveedoresPage() {
           <button
             type="submit"
             disabled={crearProveedor.isPending}
-            className="col-span-2 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearProveedor.isPending ? "Guardando..." : "Guardar proveedor"}
           </button>
@@ -157,7 +157,7 @@ export function ProveedoresPage() {
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>

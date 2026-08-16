@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { ChevronRight } from "lucide-react";
 
 // Manual de usuario embebido en la aplicación — pensado para cualquier
 // persona que use el sistema día a día (no solo para quien lo programó).
@@ -492,7 +493,7 @@ export function AcercaDePage() {
             ref={(el) => {
               refs.current[seccion.id] = el;
             }}
-            className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 scroll-mt-4"
+            className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 scroll-mt-4"
           >
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">{seccion.titulo}</h3>
             <div className="space-y-2">
@@ -500,17 +501,7 @@ export function AcercaDePage() {
                 <details key={i} className="group border border-gray-200 dark:border-gray-700 rounded-md">
                   <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-900/40 rounded-md">
                     {tema.pregunta}
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform group-open:rotate-90"
-                    >
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
+                    <ChevronRight strokeWidth={2} className="w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform group-open:rotate-90" />
                   </summary>
                   <div className="px-3 pb-3 pt-1 text-sm text-gray-600 dark:text-gray-300 space-y-2 border-t border-gray-100 dark:border-gray-700">
                     {tema.respuesta}

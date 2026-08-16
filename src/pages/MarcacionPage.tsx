@@ -48,7 +48,7 @@ export function MarcacionPage({ empresaIdInicial }: Props) {
           />
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5">
           {!empresaId ? (
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Selecciona tu empresa</p>

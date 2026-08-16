@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Menu, Clock, LogOut } from "lucide-react";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ProductosPage } from "./pages/ProductosPage";
 import { PuntoDeVentaPage } from "./pages/PuntoDeVentaPage";
@@ -17,9 +18,11 @@ import { ProveedoresPage } from "./pages/ProveedoresPage";
 import { CategoriasPage } from "./pages/CategoriasPage";
 import { TiposPrecioPage } from "./pages/TiposPrecioPage";
 import { CuentasBancariasPage } from "./pages/CuentasBancariasPage";
+import { BancosPage } from "./pages/BancosPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
 import { AuditoriaPage } from "./pages/AuditoriaPage";
 import { ContabilidadPage } from "./pages/ContabilidadPage";
+import { AtsPage } from "./pages/AtsPage";
 import { EmpleadosPage } from "./pages/EmpleadosPage";
 import { NominaPage } from "./pages/NominaPage";
 import { VisitasPage } from "./pages/VisitasPage";
@@ -156,63 +159,65 @@ function App() {
     <ConfirmProvider>
     <AuthContext.Provider value={usuario}>
       <div className="h-screen flex flex-col bg-gray-100 dark:bg-gray-950">
-        <header className="bg-sky-700 dark:bg-gray-900 text-white px-4 py-3 flex justify-between items-center shrink-0 shadow-sm z-10">
+        <header className="bg-brand-700 dark:bg-gray-900 text-white px-4 py-3 flex justify-between items-center shrink-0 shadow-sm z-10">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarAbierto(!sidebarAbierto)}
               aria-label="Alternar menú"
-              className="p-1.5 rounded-md hover:bg-sky-600 dark:hover:bg-gray-800"
+              className="p-1.5 rounded-md hover:bg-brand-600 dark:hover:bg-gray-800"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-5 h-5">
-                <path d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <Menu strokeWidth={2} className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-semibold">AmbrossISP PYMES</h1>
+            <h1
+              onClick={() => setPestanaActiva("dashboard")}
+              className="text-lg font-semibold cursor-pointer hover:opacity-90"
+              title="Ir al Dashboard"
+            >
+              AmbrossISP PYMES
+            </h1>
             {empresa && (
-              <span className="text-xs bg-sky-800 dark:bg-gray-800 text-sky-100 dark:text-slate-300 px-2 py-1 rounded-md">
+              <span className="text-xs bg-brand-800 dark:bg-gray-800 text-brand-100 dark:text-slate-300 px-2 py-1 rounded-md">
                 {empresa.nombre}
               </span>
             )}
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-sky-100 dark:text-slate-300">
+            <span className="text-brand-100 dark:text-slate-300">
               {usuario.nombre}{" "}
-              <span className="text-sky-200/70 dark:text-slate-500">
+              <span className="text-brand-200/70 dark:text-slate-500">
                 ({esAdmin ? "Administrador" : "Acceso personalizado"})
               </span>
             </span>
             <BotonTema
               tema={tema}
               onAlternar={alternarTema}
-              className="text-sky-100 hover:text-white hover:bg-sky-600 dark:hover:bg-gray-800 p-1.5 rounded-md"
+              className="text-brand-100 hover:text-white hover:bg-brand-600 dark:hover:bg-gray-800 p-1.5 rounded-md"
             />
             <button
               onClick={() => setMostrarMarcacion(true)}
               title="Marcar asistencia de un empleado desde este dispositivo"
               aria-label="Marcar asistencia"
-              className="text-sky-100 hover:text-white hover:bg-sky-600 dark:hover:bg-gray-800 p-1.5 rounded-md"
+              className="text-brand-100 hover:text-white hover:bg-brand-600 dark:hover:bg-gray-800 p-1.5 rounded-md"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3.5 2" />
-              </svg>
+              <Clock strokeWidth={1.75} className="w-5 h-5" />
             </button>
             <button
               onClick={() => setPestanaActiva("acercaDe")}
-              className="text-sky-100 hover:text-white hover:underline text-xs font-medium"
+              className="text-brand-100 hover:text-white hover:underline text-xs font-medium"
             >
               Acerca de
             </button>
             <button
               onClick={() => setMostrarCambiarPassword(true)}
-              className="text-sky-100 hover:text-white hover:underline text-xs font-medium"
+              className="text-brand-100 hover:text-white hover:underline text-xs font-medium"
             >
               Cambiar contraseña
             </button>
             <button
               onClick={cerrarSesion}
-              className="bg-sky-800 dark:bg-gray-800 hover:bg-sky-900 dark:hover:bg-gray-700 px-3 py-1.5 rounded-md text-xs font-medium"
+              className="flex items-center gap-1.5 bg-brand-800 dark:bg-gray-800 hover:bg-brand-900 dark:hover:bg-gray-700 px-3 py-1.5 rounded-md text-xs font-medium"
             >
+              <LogOut strokeWidth={2} className="w-3.5 h-3.5" />
               Cerrar sesión
             </button>
           </div>
@@ -277,6 +282,7 @@ function App() {
               {pestanaActiva === "categorias" && puedeProductos && <CategoriasPage />}
               {pestanaActiva === "tiposPrecio" && esAdmin && <TiposPrecioPage />}
               {pestanaActiva === "cuentasBancarias" && esAdmin && <CuentasBancariasPage />}
+              {pestanaActiva === "bancos" && esAdmin && <BancosPage />}
               {pestanaActiva === "traslados" && puedeTraslados && <TrasladosPage />}
               {pestanaActiva === "reportes" && puedeReportes && <ReportesPage />}
               {pestanaActiva === "reporteadorPrincipal" && puedeReportes && (
@@ -292,6 +298,7 @@ function App() {
               {pestanaActiva === "usuarios" && esAdmin && <UsuariosPage />}
               {pestanaActiva === "auditoria" && puedeAuditoria && <AuditoriaPage />}
               {pestanaActiva === "contabilidad" && puedeContabilidad && <ContabilidadPage />}
+              {pestanaActiva === "ats" && puedeContabilidad && <AtsPage />}
               {pestanaActiva === "empleados" && puedeNomina && <EmpleadosPage />}
               {pestanaActiva === "nomina" && puedeNomina && <NominaPage />}
               {pestanaActiva === "visitas" && mostrarVisitas && <VisitasPage />}

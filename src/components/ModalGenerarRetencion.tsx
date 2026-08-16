@@ -190,7 +190,7 @@ export function ModalGenerarRetencion({ compra, onCerrar }: Props) {
           type="button"
           onClick={() => generarRetencion.mutate()}
           disabled={!lineasValidas || excedeSaldo || generarRetencion.isPending}
-          className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+          className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
         >
           {generarRetencion.isPending ? "Generando..." : "Generar retención"}
         </button>

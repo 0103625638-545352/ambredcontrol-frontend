@@ -73,7 +73,7 @@ export function CategoriasPage() {
         <button
           type="submit"
           disabled={crearCategoria.isPending}
-          className="bg-emerald-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
         >
           {crearCategoria.isPending ? "Guardando..." : "+ Agregar"}
         </button>
@@ -82,7 +82,7 @@ export function CategoriasPage() {
         <p className="text-red-600 dark:text-red-400 text-sm mb-4">Error al crear la categoría.</p>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden max-w-lg">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden max-w-lg">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>

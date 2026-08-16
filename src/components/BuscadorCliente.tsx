@@ -99,7 +99,7 @@ export function BuscadorCliente({ clienteId, onSeleccionar }: Props) {
                   <button
                     type="button"
                     onClick={() => setMostrarModal(true)}
-                    className="w-full bg-emerald-600 text-white text-xs font-medium py-1.5 rounded-md hover:bg-emerald-700"
+                    className="w-full bg-brand-600 text-white text-xs font-medium py-1.5 rounded-md hover:bg-brand-700"
                   >
                     + Nuevo cliente
                   </button>

@@ -223,7 +223,7 @@ export function LoginPage({ onLoginExitoso, tema, alternarTema }: Props) {
       />
 
       {modo === "login" ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 w-full max-w-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-8 w-full max-w-sm">
           <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-1 text-center">
             AmbrossISP PYMES
           </h1>
@@ -307,7 +307,7 @@ export function LoginPage({ onLoginExitoso, tema, alternarTema }: Props) {
           </div>
         </div>
       ) : modo === "crear-empresa" ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 w-full max-w-md">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-8 w-full max-w-md">
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Crear empresa nueva</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
             Crea una base de datos completamente separada para otro negocio, con su propio usuario administrador.
@@ -426,7 +426,7 @@ export function LoginPage({ onLoginExitoso, tema, alternarTema }: Props) {
             <button
               type="submit"
               disabled={creandoEmpresa}
-              className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
             >
               {creandoEmpresa ? "Creando empresa (puede tardar unos segundos)..." : "Crear empresa"}
             </button>
@@ -440,7 +440,7 @@ export function LoginPage({ onLoginExitoso, tema, alternarTema }: Props) {
           </button>
         </div>
       ) : modo === "eliminar-empresa" ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 w-full max-w-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-8 w-full max-w-sm">
           <h1 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-1">Eliminar empresa</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
             Borra su base de datos y sus archivos para siempre. No hay forma de deshacerlo — solo puede hacerlo
@@ -523,7 +523,7 @@ export function LoginPage({ onLoginExitoso, tema, alternarTema }: Props) {
           </button>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 w-full max-w-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-8 w-full max-w-sm">
           <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Recuperar contraseña</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
             {pasoOlvide === "solicitar"
@@ -602,7 +602,7 @@ export function LoginPage({ onLoginExitoso, tema, alternarTema }: Props) {
               <button
                 type="submit"
                 disabled={confirmarRecuperacion.isPending}
-                className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
               >
                 {confirmarRecuperacion.isPending ? "Guardando..." : "Cambiar contraseña"}
               </button>

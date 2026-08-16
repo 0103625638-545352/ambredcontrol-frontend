@@ -145,7 +145,7 @@ function SeccionMiRuta() {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Mi ruta de hoy</h3>
         {pendientes.length > 0 && (
@@ -216,7 +216,7 @@ function SeccionMiRuta() {
                     <button
                       onClick={() => marcarLlegada.mutate(v.id)}
                       disabled={marcarLlegada.isPending}
-                      className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+                      className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
                     >
                       {marcarLlegada.isPending ? "Ubicando..." : "Llegué"}
                     </button>
@@ -433,7 +433,7 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Planificar rutas</h3>
 
       {puedeEditar && (
@@ -501,7 +501,7 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
           <button
             type="submit"
             disabled={crearRuta.isPending || paradas.length === 0 || !empleadoId}
-            className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearRuta.isPending ? "Creando ruta..." : "Crear ruta"}
           </button>
@@ -744,13 +744,13 @@ function BuscadorEquiposInstalados() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Buscar equipo instalado</h3>
         {resultados && resultados.length > 0 && (
           <button
             onClick={exportarExcel}
-            className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700"
+            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
           >
             Exportar a Excel
           </button>

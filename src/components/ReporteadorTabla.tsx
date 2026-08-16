@@ -152,14 +152,14 @@ export function ReporteadorTabla<T>({
         <button
           onClick={exportarExcel}
           disabled={filasOrdenadas.length === 0}
-          className="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+          className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
         >
           Exportar a Excel
         </button>
       </div>
 
       {datosGrafico && datosGrafico.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Total por día</p>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={datosGrafico} barCategoryGap={2} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
@@ -173,7 +173,7 @@ export function ReporteadorTabla<T>({
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>

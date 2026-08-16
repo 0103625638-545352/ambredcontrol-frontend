@@ -88,7 +88,7 @@ export function ModalCerrarCaja({ efectivoEsperado, onCerrar, onCerrado }: Props
         <button
           type="submit"
           disabled={cerrarCaja.isPending}
-          className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+          className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
         >
           {cerrarCaja.isPending ? "Cerrando..." : "Confirmar cierre"}
         </button>

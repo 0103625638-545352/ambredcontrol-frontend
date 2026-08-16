@@ -31,7 +31,7 @@ function CajasAbiertasAhora() {
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Cajas abiertas ahora</h2>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>
@@ -146,7 +146,7 @@ export function CajaPage() {
         {cargandoActual ? (
           <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
         ) : !sesion ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 max-w-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 max-w-sm">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Abrir caja</h3>
             <form
               onSubmit={(e) => {
@@ -187,7 +187,7 @@ export function CajaPage() {
               <button
                 type="submit"
                 disabled={abrirCaja.isPending}
-                className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
               >
                 {abrirCaja.isPending ? "Abriendo..." : "Abrir caja"}
               </button>
@@ -200,7 +200,7 @@ export function CajaPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
               <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">
                 Caja abierta por {sesion.abiertaPor.nombre}
                 {sesion.puntoVenta && <span className="text-gray-500 dark:text-gray-400 font-normal"> — {sesion.puntoVenta.nombre}</span>}
@@ -252,7 +252,7 @@ export function CajaPage() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
               <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Movimientos de esta caja</h3>
               {sesion.movimientos?.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">Sin movimientos manuales todavía</p>}
               {sesion.movimientos && sesion.movimientos.length > 0 && (
@@ -297,7 +297,7 @@ export function CajaPage() {
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr>

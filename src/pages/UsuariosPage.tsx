@@ -122,7 +122,7 @@ function TarjetaSucursales() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Sucursales</h3>
         <button
@@ -157,7 +157,7 @@ function TarjetaSucursales() {
           <button
             type="submit"
             disabled={crearSucursal.isPending}
-            className="col-span-2 bg-emerald-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearSucursal.isPending ? "Guardando..." : "Crear sucursal"}
           </button>
@@ -210,7 +210,7 @@ function TarjetaSucursales() {
             <button
               type="submit"
               disabled={editarSucursal.isPending}
-              className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
             >
               {editarSucursal.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -284,7 +284,7 @@ function TarjetaBodegas() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Bodegas</h3>
         <button
@@ -324,7 +324,7 @@ function TarjetaBodegas() {
           <button
             type="submit"
             disabled={crearBodega.isPending}
-            className="col-span-2 bg-emerald-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearBodega.isPending ? "Guardando..." : "Crear bodega"}
           </button>
@@ -383,7 +383,7 @@ function TarjetaBodegas() {
             <button
               type="submit"
               disabled={editarBodega.isPending}
-              className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
             >
               {editarBodega.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -456,7 +456,7 @@ function TarjetaPuntosVenta() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Puntos de venta</h3>
         <button
@@ -501,7 +501,7 @@ function TarjetaPuntosVenta() {
           <button
             type="submit"
             disabled={crearPuntoVenta.isPending}
-            className="col-span-2 bg-emerald-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearPuntoVenta.isPending ? "Guardando..." : "Crear punto de venta"}
           </button>
@@ -562,7 +562,7 @@ function TarjetaPuntosVenta() {
             <button
               type="submit"
               disabled={editarPuntoVenta.isPending}
-              className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
             >
               {editarPuntoVenta.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -791,7 +791,7 @@ export function UsuariosPage() {
           <button
             type="submit"
             disabled={crearUsuario.isPending}
-            className="col-span-2 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
           >
             {crearUsuario.isPending ? "Guardando..." : "Crear usuario"}
           </button>
@@ -803,7 +803,7 @@ export function UsuariosPage() {
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>
@@ -951,7 +951,7 @@ export function UsuariosPage() {
             <button
               type="submit"
               disabled={editarUsuario.isPending}
-              className="col-span-2 bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
             >
               {editarUsuario.isPending ? "Guardando..." : "Guardar cambios"}
             </button>

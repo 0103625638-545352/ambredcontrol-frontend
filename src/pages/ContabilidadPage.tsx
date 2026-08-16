@@ -197,7 +197,7 @@ function PanelCierreContable() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 mb-4 flex flex-wrap items-end gap-3">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 mb-4 flex flex-wrap items-end gap-3">
       <div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Cierre contable</p>
         <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
@@ -274,7 +274,7 @@ function PestanaPlanCuentas({ puedeEditar, onNuevaCuenta }: { puedeEditar: boole
           </button>
         </div>
       )}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>
@@ -433,7 +433,7 @@ function PestanaLibroMayor() {
       {cuentaId === "" && <p className="text-sm text-gray-400 dark:text-gray-500">Selecciona una cuenta para ver su libro mayor.</p>}
 
       {cuentaId !== "" && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-x-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr>
@@ -506,7 +506,7 @@ function PestanaBalanceComprobacion() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
             <tr>
@@ -555,7 +555,7 @@ function PestanaBalanceComprobacion() {
 function TablaSeccion({ titulo, filas }: { titulo: string; filas: { cuenta: CuentaContable; saldo: string }[] }) {
   const total = filas.reduce((acc, f) => acc + parseFloat(f.saldo), 0);
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{titulo}</h3>
       </div>
@@ -624,7 +624,7 @@ function PestanaBalanceGeneral() {
             filas={[...data.patrimonio, { cuenta: { id: -1, codigo: "", nombre: "Utilidad del ejercicio", tipo: "PATRIMONIO", naturaleza: "ACREEDORA", cuentaPadreId: null, permiteMovimiento: false, activa: true, createdAt: "" }, saldo: data.utilidadEjercicio }]}
           />
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 flex justify-between items-center">
+          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center">
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Activo: ${data.totales.activo}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Pasivo + Patrimonio: ${data.totales.pasivoMasPatrimonio}</p>
@@ -691,7 +691,7 @@ function PestanaEstadoResultados() {
           <TablaSeccion titulo="Costos" filas={data.costos} />
           <TablaSeccion titulo="Gastos" filas={data.gastos} />
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 grid grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 grid grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ingresos</p>
               <p className="text-lg font-bold text-gray-800 dark:text-gray-100">${data.resumen.totalIngresos}</p>

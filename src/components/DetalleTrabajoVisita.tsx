@@ -176,7 +176,7 @@ export function DetalleTrabajoVisita({ visita }: { visita: VisitaTecnica }) {
           type="button"
           onClick={() => guardar.mutate()}
           disabled={guardar.isPending}
-          className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+          className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
         >
           {guardar.isPending ? "Guardando..." : "Guardar detalle"}
         </button>

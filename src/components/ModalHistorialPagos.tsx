@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Pago, urlComprobantePago } from "../api/client";
+import * as XLSX from "xlsx";
+import { api, type Pago, urlComprobantePago, origenPagoTexto } from "../api/client";
 import { Modal } from "./Modal";
 import { useConfirm } from "./ConfirmProvider";
 import { useToast } from "./ToastProvider";
@@ -48,8 +49,45 @@ export function ModalHistorialPagos({ endpointBase, documento, queryKeysAInvalid
 
   const saldo = data ? (parseFloat(data.total) - parseFloat(data.montoPagado)).toFixed(2) : "0.00";
 
+  // Exporta el historial de pagos a un .xlsx — para cuando el cliente pide
+  // un respaldo del abono que hizo, o para llevarlo a contabilidad. Mismo
+  // patrón que exportarExcel() en ReportesPage.tsx (json_to_sheet + writeFile,
+  // todo en el navegador, sin pasar por el backend).
+  function exportarExcel() {
+    if (!data || data.pagos.length === 0) return;
+    const libro = XLSX.utils.book_new();
+    const hoja = XLSX.utils.json_to_sheet(
+      data.pagos.map((p) => ({
+        Fecha: new Date(p.fecha).toLocaleString("es-EC"),
+        Monto: Number(p.monto),
+        "Forma de pago": p.formaPago,
+        "Cuenta bancaria": p.cuentaBancaria ? `${p.cuentaBancaria.banco} — ${p.cuentaBancaria.numeroCuenta}` : "",
+        Cuota: p.cuota ? `Cuota ${p.cuota.numero}` : "",
+        "Origen del pago": origenPagoTexto(p) ?? "",
+        Referencia: p.referencia ?? "",
+      }))
+    );
+    XLSX.utils.book_append_sheet(libro, hoja, "Pagos");
+    const nombreArchivo = `pagos_${documento.replace(/\s+/g, "_")}.xlsx`;
+    XLSX.writeFile(libro, nombreArchivo);
+  }
+
   return (
-    <Modal titulo={`Pagos registrados — ${documento}`} onCerrar={onCerrar} ancho="max-w-2xl">
+    <Modal
+      titulo={`Pagos registrados — ${documento}`}
+      onCerrar={onCerrar}
+      ancho="max-w-2xl"
+      accionExtra={
+        data && data.pagos.length > 0 ? (
+          <button
+            onClick={exportarExcel}
+            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
+          >
+            Exportar Excel
+          </button>
+        ) : undefined
+      }
+    >
       {isLoading && <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>}
       {data && (
         <>
@@ -77,6 +115,7 @@ export function ModalHistorialPagos({ endpointBase, documento, queryKeysAInvalid
                   <th className="px-3 py-2">Fecha</th>
                   <th className="px-3 py-2 text-right">Monto</th>
                   <th className="px-3 py-2">Forma de pago</th>
+                  <th className="px-3 py-2">Cuota</th>
                   <th className="px-3 py-2">Referencia</th>
                   <th className="px-3 py-2"></th>
                 </tr>
@@ -94,8 +133,14 @@ export function ModalHistorialPagos({ endpointBase, documento, queryKeysAInvalid
                         </div>
                       )}
                     </td>
+                    <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                      {p.cuota ? `Cuota ${p.cuota.numero}` : "—"}
+                    </td>
                     <td className="px-3 py-2 text-gray-500 dark:text-gray-400">
                       {p.referencia ?? "—"}
+                      {origenPagoTexto(p) && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{origenPagoTexto(p)}</div>
+                      )}
                       {urlComprobantePago(p) && (
                         <div>
                           <a

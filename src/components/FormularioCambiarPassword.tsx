@@ -77,7 +77,7 @@ export function FormularioCambiarPassword({ onExito, esCambioObligatorio }: Prop
       <button
         type="submit"
         disabled={cambiarPassword.isPending}
-        className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+        className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
       >
         {cambiarPassword.isPending ? "Guardando..." : "Cambiar contraseña"}
       </button>

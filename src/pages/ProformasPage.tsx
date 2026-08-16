@@ -195,7 +195,7 @@ export function ProformasPage() {
         </p>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Columna izquierda: buscar productos para agregar */}
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Productos</h3>
             <input
               type="text"
@@ -227,7 +227,7 @@ export function ProformasPage() {
           </div>
 
           {/* Columna derecha: datos de la proforma */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex flex-col">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Datos de la proforma</h3>
 
             <BuscadorCliente
@@ -285,7 +285,7 @@ export function ProformasPage() {
               <button
                 onClick={() => (editandoId !== null ? editarProforma.mutate() : crearProforma.mutate())}
                 disabled={carrito.length === 0 || !clienteId || crearProforma.isPending || editarProforma.isPending}
-                className="w-full bg-emerald-600 text-white py-2 rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-40"
+                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
               >
                 {editandoId !== null
                   ? editarProforma.isPending
@@ -316,7 +316,7 @@ export function ProformasPage() {
 
       <div>
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Historial de proformas</h2>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
               <tr>

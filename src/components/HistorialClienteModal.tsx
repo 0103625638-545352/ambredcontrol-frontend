@@ -96,7 +96,7 @@ export function HistorialClienteModal({ clienteId, nombreCliente, onCerrar }: Pr
         ((pestana === "compras" && data && data.length > 0) || (pestana === "visitas" && visitas && visitas.length > 0)) && (
           <button
             onClick={pestana === "compras" ? exportarExcelCompras : exportarExcelVisitas}
-            className="bg-emerald-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-emerald-700"
+            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
           >
             Exportar a Excel
           </button>

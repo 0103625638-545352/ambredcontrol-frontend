@@ -12,7 +12,7 @@ interface Props {
 export function CambiarPasswordObligatorioPage({ nombreUsuario, onCambiada }: Props) {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 w-full max-w-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-8 w-full max-w-sm">
         <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-1 text-center">
           Cambia tu contraseña
         </h1>
