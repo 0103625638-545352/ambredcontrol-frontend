@@ -2388,10 +2388,11 @@ export interface EgresoPendienteTecnico {
 
 export interface AlertaRed {
   id: number;
-  tipo: "CORTE_MASIVO" | "SENAL_DEGRADADA";
-  olt: { id: number; nombre: string };
-  slot: number;
-  puerto: number;
+  tipo: "CORTE_MASIVO" | "SENAL_DEGRADADA" | "NODO_CAIDO";
+  olt: { id: number; nombre: string } | null;
+  nodo: { id: number; nombre: string; mikrotikHost: string } | null;
+  slot: number | null;
+  puerto: number | null;
   cantidadAfectadas: number;
   mensaje: string;
   fechaInicio: string;
@@ -2407,6 +2408,21 @@ export interface AlertaRed {
     cliente: { id: number; razonSocial: string; telefono: string | null } | null;
   } | null;
   clientesAfectados: { id: number; razonSocial: string; telefono: string | null; estadoOnu: string | null }[];
+}
+
+export interface DisponibilidadNodo {
+  nodoId: number;
+  nombre: string;
+  host: string;
+  clientes: number;
+  disponibilidad: number | null;
+  chequeos: number;
+  latenciaPromedioMs: number | null;
+  caidas: number;
+  minutosCaido: number;
+  caidoAhora: boolean;
+  ultimoChequeo: { enLinea: boolean; fecha: string; error: string | null } | null;
+  ultimaConexionExitosa: string | null;
 }
 
 export interface OnuPeorSenal {

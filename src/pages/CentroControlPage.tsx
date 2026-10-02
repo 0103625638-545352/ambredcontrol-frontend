@@ -1,10 +1,11 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Siren, Activity, Users, PackageX, Fuel, DollarSign, Star, AlertTriangle, TrendingDown, Percent, Wallet, MapPinOff } from "lucide-react";
+import { Siren, Activity, Users, PackageX, Fuel, DollarSign, Star, AlertTriangle, TrendingDown, Percent, Wallet, MapPinOff, Router } from "lucide-react";
 import {
   api,
   type AlertaRed,
+  type DisponibilidadNodo,
   type OnuPeorSenal,
   type LecturaSenal,
   type VisitasSospechosas,
@@ -231,17 +232,22 @@ function SeccionRed({ alertasAbiertas }: { alertasAbiertas: AlertaRed[] | undefi
 
   const lista = verCerradas ? todas : alertasAbiertas;
   const cortes = alertasAbiertas?.filter((a) => a.tipo === "CORTE_MASIVO") ?? [];
+  const nodosCaidos = alertasAbiertas?.filter((a) => a.tipo === "NODO_CAIDO") ?? [];
   const degradadas = alertasAbiertas?.filter((a) => a.tipo === "SENAL_DEGRADADA") ?? [];
-  const clientesSinServicio = cortes.reduce((s, a) => s + a.clientesAfectados.filter((c) => c.estadoOnu === "OFFLINE").length, 0);
+  const clientesSinServicio =
+    cortes.reduce((s, a) => s + a.clientesAfectados.filter((c) => c.estadoOnu === "OFFLINE").length, 0) +
+    nodosCaidos.reduce((s, a) => s + a.clientesAfectados.length, 0);
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <TarjetaKpi icono={Siren} etiqueta="Cortes masivos abiertos" valor={String(cortes.length)} color={cortes.length > 0 ? "bg-red-600" : "bg-gray-500"} />
-        <TarjetaKpi icono={Users} etiqueta="Clientes sin servicio (cortes)" valor={String(clientesSinServicio)} color={clientesSinServicio > 0 ? "bg-red-700" : "bg-gray-500"} />
+        <TarjetaKpi icono={Router} etiqueta="Nodos caídos" valor={String(nodosCaidos.length)} color={nodosCaidos.length > 0 ? "bg-red-700" : "bg-gray-500"} />
+        <TarjetaKpi icono={Siren} etiqueta="Cortes masivos (fibra)" valor={String(cortes.length)} color={cortes.length > 0 ? "bg-red-600" : "bg-gray-500"} />
+        <TarjetaKpi icono={Users} etiqueta="Clientes afectados" valor={String(clientesSinServicio)} color={clientesSinServicio > 0 ? "bg-red-700" : "bg-gray-500"} />
         <TarjetaKpi icono={TrendingDown} etiqueta="Señales degradadas" valor={String(degradadas.length)} color={degradadas.length > 0 ? "bg-amber-600" : "bg-gray-500"} />
-        <TarjetaKpi icono={Activity} etiqueta="Peor señal ahora" valor={peores?.[0] ? `${peores[0].rxPowerDbm} dBm` : "—"} color="bg-brand-700" />
       </div>
+
+      <DisponibilidadNodos />
 
       <div className={CLASE_PANEL}>
         <TituloPanel
@@ -261,21 +267,21 @@ function SeccionRed({ alertasAbiertas }: { alertasAbiertas: AlertaRed[] | undefi
             <div className="flex flex-wrap items-start gap-3 px-4 py-3">
               <span
                 className={`mt-0.5 font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm text-white ${
-                  a.fechaFin ? "bg-gray-400" : a.tipo === "CORTE_MASIVO" ? "bg-red-600" : "bg-amber-600"
+                  a.fechaFin ? "bg-gray-400" : a.tipo === "SENAL_DEGRADADA" ? "bg-amber-600" : "bg-red-600"
                 }`}
               >
-                {a.tipo === "CORTE_MASIVO" ? "Corte masivo" : "Señal degradada"}
+                {a.tipo === "CORTE_MASIVO" ? "Corte masivo" : a.tipo === "NODO_CAIDO" ? "Nodo caído" : "Señal degradada"}
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-gray-800 dark:text-gray-100">{a.mensaje}</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                  {a.olt.nombre} · PON {a.slot}/{a.puerto} · desde {fechaHora(a.fechaInicio)} ({duracion(a.fechaInicio, a.fechaFin)})
+                  {a.nodo ? `${a.nodo.nombre} (${a.nodo.mikrotikHost})` : `${a.olt?.nombre ?? "OLT"} · PON ${a.slot}/${a.puerto}`} · desde {fechaHora(a.fechaInicio)} ({duracion(a.fechaInicio, a.fechaFin)})
                   {a.fechaFin && ` · cerrada ${a.cerradaManualmente ? "a mano" : "sola"} ${fechaHora(a.fechaFin)}`}
                   {a.cantidadTickets > 0 && ` · ${a.cantidadTickets} ticket(s) vinculado(s)`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {a.tipo === "CORTE_MASIVO" && (
+                {(a.tipo === "CORTE_MASIVO" || a.tipo === "NODO_CAIDO") && (
                   <button onClick={() => setExpandida(expandida === a.id ? null : a.id)} className={CLASE_ACCION}>
                     {expandida === a.id ? "Ocultar clientes" : `Ver ${a.clientesAfectados.length} cliente(s)`}
                   </button>
@@ -304,7 +310,7 @@ function SeccionRed({ alertasAbiertas }: { alertasAbiertas: AlertaRed[] | undefi
                   <thead className={CLASE_THEAD}>
                     <tr>
                       <th className="px-3 py-1.5">Cliente</th>
-                      <th className="px-3 py-1.5">ONU</th>
+                      <th className="px-3 py-1.5">{a.tipo === "NODO_CAIDO" ? "Ping" : "ONU"}</th>
                       <th className="px-3 py-1.5 text-right">Avisar</th>
                     </tr>
                   </thead>
@@ -326,7 +332,7 @@ function SeccionRed({ alertasAbiertas }: { alertasAbiertas: AlertaRed[] | undefi
                     ))}
                     {a.clientesAfectados.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-3 py-2 text-center text-xs text-gray-400">Ninguna ONU de este puerto está vinculada a un cliente todavía.</td>
+                        <td colSpan={3} className="px-3 py-2 text-center text-xs text-gray-400">{a.tipo === "NODO_CAIDO" ? "Este nodo no tiene clientes activos." : "Ninguna ONU de este puerto está vinculada a un cliente todavía."}</td>
                       </tr>
                     )}
                   </tbody>
@@ -387,6 +393,97 @@ function SeccionRed({ alertasAbiertas }: { alertasAbiertas: AlertaRed[] | undefi
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function colorDisponibilidad(d: number | null): string {
+  if (d === null) return "text-gray-400";
+  if (d >= 99) return "text-emerald-600 dark:text-emerald-400";
+  if (d >= 95) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400 font-semibold";
+}
+
+function textoMinutos(minutos: number): string {
+  if (minutos < 60) return `${Math.max(1, minutos)} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 48) return `${horas} h ${minutos % 60} min`;
+  return `${Math.floor(horas / 24)} días ${horas % 24} h`;
+}
+
+function DisponibilidadNodos() {
+  const [dias, setDias] = useState(30);
+  const { data, isLoading } = useQuery({
+    queryKey: ["centro-control-disponibilidad", dias],
+    queryFn: async () => (await api.get<DisponibilidadNodo[]>("/centro-control/red/disponibilidad-nodos", { params: { dias } })).data,
+    refetchInterval: 120_000,
+  });
+
+  return (
+    <div className={CLASE_PANEL}>
+      <TituloPanel
+        titulo="Disponibilidad de nodos"
+        detalle="El sistema prueba la conexión con el Mikrotik de cada nodo cada 5 minutos. Si un nodo que funcionaba deja de responder dos veces seguidas, se abre una alerta y llega un correo."
+        acciones={
+          <select id="periodo-disponibilidad" value={dias} onChange={(e) => setDias(Number(e.target.value))} className={`${CLASE_CAMPO} !w-auto !py-1 !text-xs`} aria-label="Período">
+            <option value={1}>Últimas 24 horas</option>
+            <option value={7}>Últimos 7 días</option>
+            <option value={30}>Últimos 30 días</option>
+            <option value={90}>Últimos 90 días</option>
+          </select>
+        }
+      />
+      {isLoading && <Cargando />}
+      {data && data.length === 0 && <Vacio>No hay nodos activos.</Vacio>}
+      {data && data.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className={CLASE_THEAD}>
+              <tr>
+                <th className="px-4 py-2">Nodo</th>
+                <th className="px-4 py-2">Ahora</th>
+                <th className="px-4 py-2 text-right">Disponibilidad</th>
+                <th className="px-4 py-2 text-right">Caídas</th>
+                <th className="px-4 py-2 text-right">Tiempo caído</th>
+                <th className="px-4 py-2 text-right">Respuesta</th>
+                <th className="px-4 py-2 text-right">Clientes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((n) => (
+                <tr key={n.nodoId} className="border-t border-stone-100 dark:border-gray-700 align-top">
+                  <td className={CLASE_TD}>
+                    {n.nombre}
+                    <span className="block font-mono text-[11px] text-gray-400">{n.host}</span>
+                  </td>
+                  <td className={CLASE_TD}>
+                    {!n.ultimoChequeo ? (
+                      <span className="text-xs text-gray-400">sin chequeos todavía</span>
+                    ) : n.ultimoChequeo.enLinea ? (
+                      <span className="font-mono text-[10px] uppercase tracking-wider border border-emerald-500 text-emerald-700 dark:text-emerald-400 px-1 rounded-sm">En línea</span>
+                    ) : (
+                      <span title={n.ultimoChequeo.error ?? ""}>
+                        <span className="font-mono text-[10px] uppercase tracking-wider border border-red-500 text-red-600 dark:text-red-400 px-1 rounded-sm">Sin respuesta</span>
+                        <span className="block text-[11px] text-gray-400 mt-0.5">
+                          {n.ultimaConexionExitosa ? `última conexión ${fechaHora(n.ultimaConexionExitosa)}` : "nunca respondió a este servidor"}
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                  <td className={`${CLASE_TD} text-right font-mono tabular-nums ${colorDisponibilidad(n.disponibilidad)}`}>
+                    {n.disponibilidad != null ? `${n.disponibilidad}%` : "—"}
+                    <span className="block text-[10px] font-sans font-normal text-gray-400">{n.chequeos} chequeos</span>
+                  </td>
+                  <td className={`${CLASE_TD} text-right font-mono tabular-nums`}>{n.caidas}</td>
+                  <td className={`${CLASE_TD} text-right font-mono tabular-nums`}>{n.minutosCaido > 0 ? textoMinutos(n.minutosCaido) : "—"}</td>
+                  <td className={`${CLASE_TD} text-right font-mono tabular-nums`}>{n.latenciaPromedioMs != null ? `${n.latenciaPromedioMs} ms` : "—"}</td>
+                  <td className={`${CLASE_TD} text-right font-mono tabular-nums`}>{n.clientes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
