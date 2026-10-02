@@ -40,9 +40,9 @@ export function ModalNuevoProveedor({ identificacionInicial = "", onCerrar, onCr
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 shadow-lg w-full max-w-md p-5">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Nuevo proveedor</h3>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 shadow-xl w-full max-w-md p-5">
+        <div className="flex justify-between items-center -mx-5 -mt-5 mb-4 px-5 py-3 border-b border-stone-300 dark:border-gray-700 bg-stone-50 dark:bg-gray-900/40">
+          <h3 className="text-base font-bold text-gray-900 dark:text-gray-50">Nuevo proveedor</h3>
           <button
             onClick={onCerrar}
             aria-label="Cerrar"
@@ -62,7 +62,7 @@ export function ModalNuevoProveedor({ identificacionInicial = "", onCerrar, onCr
           <select
             value={form.tipoIdentificacion}
             onChange={(e) => setForm({ ...form, tipoIdentificacion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           >
             <option value="RUC">RUC</option>
             <option value="CEDULA">Cédula</option>
@@ -74,7 +74,7 @@ export function ModalNuevoProveedor({ identificacionInicial = "", onCerrar, onCr
             autoFocus={!form.identificacion}
             value={form.identificacion}
             onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Razón social / Nombres"
@@ -82,31 +82,31 @@ export function ModalNuevoProveedor({ identificacionInicial = "", onCerrar, onCr
             autoFocus={!!form.identificacion}
             value={form.razonSocial}
             onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
           />
           <input
             type="email"
             placeholder="Correo electrónico"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Teléfono"
             value={form.telefono}
             onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Dirección"
             value={form.direccion}
             onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
           />
           <button
             type="submit"
             disabled={crearProveedor.isPending}
-            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {crearProveedor.isPending ? "Guardando..." : "Guardar y seleccionar"}
           </button>

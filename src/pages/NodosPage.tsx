@@ -13,6 +13,8 @@ import {
 } from "../api/client";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import { Resaltar } from "../components/FormatoDocumento";
 
 // Cada cuántos segundos se revisa solo el pulso de vida de cada nodo — así
 // con muchos nodos el usuario no depende de entrar a "Probar conexión" uno
@@ -64,6 +66,7 @@ function calcularRangoDesdeMascara(host: string, prefijo: number): { inicio: str
 }
 
 export function NodosPage() {
+  const [mostrarFormularioNodo, setMostrarFormularioNodo] = useState(false);
   const queryClient = useQueryClient();
   const confirmar = useConfirm();
   const { mostrarToast } = useToast();
@@ -125,6 +128,7 @@ export function NodosPage() {
       queryClient.invalidateQueries({ queryKey: ["nodos-red"] });
       queryClient.invalidateQueries({ queryKey: ["mikrotik-reglas-suspension"] });
       setFormNuevo(FORM_VACIO);
+      setMostrarFormularioNodo(false);
       // Al crear el nodo, el backend ya intentó configurar solo las reglas
       // de Filter Rules que hacen que "Suspendido" corte de verdad el
       // tráfico (ver utils/mikrotik.ts) — si el router no respondió en ese
@@ -219,13 +223,37 @@ export function NodosPage() {
     }
   }
 
+  // Buscador del listado (en el navegador: la lista ya viene completa).
+  const filtros = useFiltrosListado(sinPaginacion);
+  const nodosFiltrados = filtrarLocal(nodos, filtros, {
+    textos: (n) => [n.nombre, n.descripcion, n.mikrotikHost, n.rangoIpInicio, n.rangoIpFin],
+  });
+
+  const formularioAbierto = mostrarFormularioNodo || nodos?.length === 0;
+
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Nodos de Red</h2>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+    <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+        <h2 className="text-base font-bold text-gray-900 dark:text-gray-50">Nodos de red</h2>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+            {nodos ? `${nodos.length} nodo${nodos.length === 1 ? "" : "s"}` : ""}
+          </span>
+          {(nodos?.length ?? 0) > 0 && (
+            <button
+              onClick={() => setMostrarFormularioNodo((v) => !v)}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-3 py-1.5 rounded-sm text-sm font-semibold hover:bg-stone-50 dark:hover:bg-gray-700"
+            >
+              {mostrarFormularioNodo ? "Cancelar" : "+ Nuevo nodo"}
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="px-4 py-2 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
         Cada nodo es un punto de conexión físico (ej. un armario de un sector) con su propio Mikrotik a cargo de los clientes de esa zona. Al crear un cliente, se elige a cuál nodo pertenece.
       </p>
 
+      {formularioAbierto && (
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -233,27 +261,29 @@ export function NodosPage() {
             crear.mutate();
           }
         }}
-        className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 grid grid-cols-2 gap-3 max-w-3xl"
+        className="p-4 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700"
       >
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-3">Nuevo nodo</p>
+        <div className="grid grid-cols-2 gap-3 max-w-3xl">
         <input
           placeholder="Nombre del nodo (ej. Nodo Misicata)"
           required
           value={formNuevo.nombre}
           onChange={(e) => setFormNuevo({ ...formNuevo, nombre: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
         />
         <input
           placeholder="Descripción / sector que cubre (opcional)"
           value={formNuevo.descripcion}
           onChange={(e) => setFormNuevo({ ...formNuevo, descripcion: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
         />
         <input
           placeholder="IP del Mikrotik (ej. 192.168.12.1)"
           required
           value={formNuevo.mikrotikHost}
           onChange={(e) => setFormNuevo({ ...formNuevo, mikrotikHost: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
         <select
           value={formNuevo.mascaraRed}
@@ -266,7 +296,7 @@ export function NodosPage() {
               ...(rango ? { rangoIpInicio: rango.inicio, rangoIpFin: rango.fin } : {}),
             });
           }}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         >
           <option value="">Máscara... Ej. /24 o /22</option>
           {MASCARAS_COMUNES.map((m) => (
@@ -279,14 +309,15 @@ export function NodosPage() {
           placeholder="Puerto API (8728 por defecto)"
           value={formNuevo.mikrotikPuerto}
           onChange={(e) => setFormNuevo({ ...formNuevo, mikrotikPuerto: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
         <input
           placeholder="Usuario API del Mikrotik"
           required
+          data-no-mayus="true"
           value={formNuevo.mikrotikUsuario}
           onChange={(e) => setFormNuevo({ ...formNuevo, mikrotikUsuario: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
         <input
           type="password"
@@ -294,40 +325,49 @@ export function NodosPage() {
           required
           value={formNuevo.mikrotikPassword}
           onChange={(e) => setFormNuevo({ ...formNuevo, mikrotikPassword: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
         <input
           placeholder="Rango IP inicio (ej. 192.168.12.1)"
           value={formNuevo.rangoIpInicio}
           onChange={(e) => setFormNuevo({ ...formNuevo, rangoIpInicio: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
         <input
           placeholder="Rango IP fin (ej. 192.168.12.254)"
           value={formNuevo.rangoIpFin}
           onChange={(e) => setFormNuevo({ ...formNuevo, rangoIpFin: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
         <button
           type="button"
           onClick={probarNuevo}
           disabled={probando === "nuevo"}
-          className="bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-600 disabled:opacity-50"
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-sm text-sm font-semibold hover:bg-stone-100 dark:hover:bg-gray-700 disabled:opacity-50"
         >
           {probando === "nuevo" ? "Probando..." : "Probar conexión"}
         </button>
         <button
           type="submit"
           disabled={crear.isPending}
-          className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+          className="bg-brand-700 text-white px-4 py-2 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
         >
           {crear.isPending ? "Guardando..." : "+ Crear nodo"}
         </button>
+        </div>
       </form>
+      )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden max-w-4xl">
+      <div className="overflow-x-auto">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · nombre, descripción, IP del Mikrotik o rango"
+          placeholder="Ej: Nodo Norte, 192.168.88.1..."
+          mostrarPago={false}
+          mostrarFechas={false}
+        />
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Estado</th>
               <th className="px-4 py-2">Nombre</th>
@@ -342,13 +382,13 @@ export function NodosPage() {
                 <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
               </tr>
             )}
-            {!isLoading && nodos?.length === 0 && (
+            {!isLoading && nodosFiltrados?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Todavía no hay nodos de red</td>
+                <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">{filtros.hayFiltros ? "Ningún nodo coincide con la búsqueda." : "Todavía no hay nodos de red"}</td>
               </tr>
             )}
-            {nodos?.map((n) => (
-              <tr key={n.id} className="border-t border-gray-100 dark:border-gray-700">
+            {nodosFiltrados?.map((n) => (
+              <tr key={n.id} className="border-t border-stone-100 dark:border-gray-700">
                 {nodoEditandoId === n.id ? (
                   <td colSpan={5} className="px-4 py-3">
                     <form
@@ -363,20 +403,20 @@ export function NodosPage() {
                         required
                         value={editForm.nombre}
                         onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
                       />
                       <input
                         placeholder="Descripción / sector"
                         value={editForm.descripcion}
                         onChange={(e) => setEditForm({ ...editForm, descripcion: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
                       />
                       <input
                         placeholder="IP del Mikrotik"
                         required
                         value={editForm.mikrotikHost}
                         onChange={(e) => setEditForm({ ...editForm, mikrotikHost: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                       />
                       <select
                         value={editForm.mascaraRed}
@@ -389,7 +429,7 @@ export function NodosPage() {
                             ...(rango ? { rangoIpInicio: rango.inicio, rangoIpFin: rango.fin } : {}),
                           });
                         }}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                       >
                         <option value="">Máscara... Ej. /24 o /22</option>
                         {MASCARAS_COMUNES.map((m) => (
@@ -402,33 +442,34 @@ export function NodosPage() {
                         placeholder="Puerto API"
                         value={editForm.mikrotikPuerto}
                         onChange={(e) => setEditForm({ ...editForm, mikrotikPuerto: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                       />
                       <input
                         placeholder="Usuario API"
                         required
+                        data-no-mayus="true"
                         value={editForm.mikrotikUsuario}
                         onChange={(e) => setEditForm({ ...editForm, mikrotikUsuario: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                       />
                       <input
                         type="password"
                         placeholder="Contraseña API (vacío = no cambiarla)"
                         value={editForm.mikrotikPassword}
                         onChange={(e) => setEditForm({ ...editForm, mikrotikPassword: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                       />
                       <input
                         placeholder="Rango IP inicio"
                         value={editForm.rangoIpInicio}
                         onChange={(e) => setEditForm({ ...editForm, rangoIpInicio: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                       />
                       <input
                         placeholder="Rango IP fin"
                         value={editForm.rangoIpFin}
                         onChange={(e) => setEditForm({ ...editForm, rangoIpFin: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                       />
                       <button
                         type="button"
@@ -441,14 +482,14 @@ export function NodosPage() {
                       <button
                         type="submit"
                         disabled={editar.isPending}
-                        className="bg-slate-800 text-white py-1.5 rounded-md text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+                        className="bg-brand-700 text-white py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
                       >
                         {editar.isPending ? "Guardando..." : "Guardar cambios"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setNodoEditandoId(null)}
-                        className="col-span-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
+                        className="col-span-2 bg-stone-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
                       >
                         Cancelar
                       </button>
@@ -460,10 +501,10 @@ export function NodosPage() {
                       <PulsoNodo pulso={pulsoPorNodo.get(n.id)} nodo={n} />
                     </td>
                     <td className="px-4 py-2">
-                      <div className="font-semibold text-gray-800 dark:text-gray-100">{n.nombre}</div>
+                      <div className="font-semibold text-gray-800 dark:text-gray-100"><Resaltar texto={n.nombre} termino={filtros.busquedaAplicada} /></div>
                       {n.descripcion && <div className="text-xs text-gray-500 dark:text-gray-400">{n.descripcion}</div>}
                     </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{n.mikrotikHost}:{n.mikrotikPuerto}</td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-600 dark:text-gray-300"><Resaltar texto={n.mikrotikHost} termino={filtros.busquedaAplicada} />:{n.mikrotikPuerto}</td>
                     <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
                       {n.rangoIpInicio && n.rangoIpFin ? `${n.rangoIpInicio} – ${n.rangoIpFin}` : <span className="text-gray-300 dark:text-gray-600 italic">sin definir</span>}
                     </td>
@@ -475,19 +516,19 @@ export function NodosPage() {
                       />
                       <button
                         onClick={() => setNodoVlansId(nodoVlansId === n.id ? null : n.id)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                        className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                       >
                         VLANs
                       </button>
                       <button
                         onClick={() => setNodoRespaldosId(nodoRespaldosId === n.id ? null : n.id)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                        className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                       >
                         Respaldos
                       </button>
                       <button
                         onClick={() => abrirEdicion(n)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                        className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                       >
                         Editar
                       </button>
@@ -504,14 +545,14 @@ export function NodosPage() {
             ))}
             {nodoVlansId !== null && nodos?.some((n) => n.id === nodoVlansId) && (
               <tr>
-                <td colSpan={5} className="px-4 py-3 bg-gray-50 dark:bg-gray-900/30">
+                <td colSpan={5} className="px-4 py-3 bg-stone-50 dark:bg-gray-900/30">
                   <PanelVlansNodo nodo={nodos!.find((n) => n.id === nodoVlansId)!} />
                 </td>
               </tr>
             )}
             {nodoRespaldosId !== null && nodos?.some((n) => n.id === nodoRespaldosId) && (
               <tr>
-                <td colSpan={5} className="px-4 py-3 bg-gray-50 dark:bg-gray-900/30">
+                <td colSpan={5} className="px-4 py-3 bg-stone-50 dark:bg-gray-900/30">
                   <PanelRespaldosNodo nodo={nodos!.find((n) => n.id === nodoRespaldosId)!} />
                 </td>
               </tr>
@@ -621,7 +662,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
   return (
     <div className="max-w-3xl">
       <div className="flex justify-between items-center mb-3">
-        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">VLANs — {nodo.nombre}</h4>
+        <h4 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">VLANs — {nodo.nombre}</h4>
         <div className="space-x-2">
           <button
             onClick={detectar}
@@ -636,7 +677,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
               setVlanEditandoId(null);
               setForm(FORM_VLAN_VACIO);
             }}
-            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
+            className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800"
           >
             + Agregar VLAN
           </button>
@@ -691,7 +732,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
             e.preventDefault();
             crear.mutate(form);
           }}
-          className="mb-3 border border-gray-200 dark:border-gray-700 rounded-md p-3 grid grid-cols-2 gap-2"
+          className="mb-3 border border-stone-300 dark:border-gray-700 rounded-md p-3 grid grid-cols-2 gap-2"
         >
           <p className="col-span-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md px-2 py-1.5">
             Esto crea la interfaz VLAN de verdad en el Mikrotik de {nodo.nombre} (no solo la guarda acá).
@@ -701,7 +742,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
             required
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
           />
           <input
             placeholder="VLAN ID (ej. 10)"
@@ -709,19 +750,19 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
             type="number"
             value={form.vlanId}
             onChange={(e) => setForm({ ...form, vlanId: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Interfaz padre (ej. ether2 o bridge1)"
             required
             value={form.interfaz}
             onChange={(e) => setForm({ ...form, interfaz: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <select
             value={form.mascaraRed}
             onChange={(e) => aplicarMascara(e.target.value, nodo.mikrotikHost, setForm, form)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           >
             <option value="">Máscara... Ej. /24 o /22</option>
             {MASCARAS_COMUNES.map((m) => (
@@ -734,18 +775,18 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
             placeholder="Rango IP inicio"
             value={form.rangoIpInicio}
             onChange={(e) => setForm({ ...form, rangoIpInicio: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Rango IP fin"
             value={form.rangoIpFin}
             onChange={(e) => setForm({ ...form, rangoIpFin: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <button
             type="submit"
             disabled={crear.isPending}
-            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-700 text-white py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {crear.isPending ? "Guardando..." : "Guardar VLAN"}
           </button>
@@ -756,7 +797,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
       {!isLoading && vlans?.length === 0 && <p className="text-xs text-gray-400 dark:text-gray-500">Todavía no hay ninguna VLAN guardada de este nodo.</p>}
       {vlans && vlans.length > 0 && (
         <table className="w-full text-xs bg-white dark:bg-gray-800 rounded-md overflow-hidden">
-          <thead className="bg-gray-100 dark:bg-gray-700 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-700 text-left text-gray-600 dark:text-gray-300">
             <tr>
               <th className="px-3 py-2">Nombre</th>
               <th className="px-3 py-2">VLAN ID</th>
@@ -768,7 +809,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
           <tbody>
             {vlans.map((v) => (
               <Fragment key={v.id}>
-                <tr className="border-t border-gray-100 dark:border-gray-700">
+                <tr className="border-t border-stone-100 dark:border-gray-700">
                   <td className="px-3 py-2">{v.nombre}</td>
                   <td className="px-3 py-2">{v.vlanId}</td>
                   <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{v.interfaz || "—"}</td>
@@ -776,7 +817,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
                     {v.rangoIpInicio && v.rangoIpFin ? `${v.rangoIpInicio} – ${v.rangoIpFin}` : "sin definir"}
                   </td>
                   <td className="px-3 py-2 text-right space-x-2 whitespace-nowrap">
-                    <button onClick={() => abrirEdicionVlan(v)} className="text-slate-700 dark:text-slate-300 hover:underline font-medium">
+                    <button onClick={() => abrirEdicionVlan(v)} className="text-brand-700 dark:text-brand-300 hover:underline font-medium">
                       Editar
                     </button>
                     <button onClick={() => confirmarDesactivarVlan(v)} className="text-red-600 dark:text-red-400 hover:underline font-medium">
@@ -785,7 +826,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
                   </td>
                 </tr>
                 {vlanEditandoId === v.id && (
-                  <tr key={`${v.id}-edit`} className="border-t border-gray-100 dark:border-gray-700">
+                  <tr key={`${v.id}-edit`} className="border-t border-stone-100 dark:border-gray-700">
                     <td colSpan={5} className="px-3 py-3">
                       <form
                         onSubmit={(e) => {
@@ -801,7 +842,7 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
                           required
                           value={form.nombre}
                           onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
                         />
                         <input
                           required
@@ -809,19 +850,19 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
                           placeholder="VLAN ID"
                           value={form.vlanId}
                           onChange={(e) => setForm({ ...form, vlanId: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <input
                           required
                           placeholder="Interfaz padre"
                           value={form.interfaz}
                           onChange={(e) => setForm({ ...form, interfaz: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <select
                           value={form.mascaraRed}
                           onChange={(e) => aplicarMascara(e.target.value, nodo.mikrotikHost, setForm, form)}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         >
                           <option value="">Máscara... Ej. /24 o /22</option>
                           {MASCARAS_COMUNES.map((m) => (
@@ -834,25 +875,25 @@ function PanelVlansNodo({ nodo }: { nodo: NodoRed }) {
                           placeholder="Rango IP inicio"
                           value={form.rangoIpInicio}
                           onChange={(e) => setForm({ ...form, rangoIpInicio: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <input
                           placeholder="Rango IP fin"
                           value={form.rangoIpFin}
                           onChange={(e) => setForm({ ...form, rangoIpFin: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <button
                           type="submit"
                           disabled={editar.isPending}
-                          className="bg-slate-800 text-white py-1.5 rounded-md text-xs font-medium hover:bg-slate-700 disabled:opacity-50"
+                          className="bg-brand-700 text-white py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800 disabled:opacity-50"
                         >
                           {editar.isPending ? "Guardando..." : "Guardar cambios"}
                         </button>
                         <button
                           type="button"
                           onClick={() => setVlanEditandoId(null)}
-                          className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
+                          className="bg-stone-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
                         >
                           Cancelar
                         </button>
@@ -928,13 +969,13 @@ function PanelRespaldosNodo({ nodo }: { nodo: NodoRed }) {
   return (
     <div className="max-w-3xl">
       <div className="flex justify-between items-center mb-3">
-        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+        <h4 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">
           Respaldos de configuración — {nodo.nombre}
         </h4>
         <button
           onClick={() => respaldar.mutate()}
           disabled={respaldar.isPending}
-          className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
+          className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800 disabled:opacity-50"
         >
           {respaldar.isPending ? "Respaldando..." : "Respaldar ahora"}
         </button>
@@ -946,7 +987,7 @@ function PanelRespaldosNodo({ nodo }: { nodo: NodoRed }) {
       )}
       {respaldos && respaldos.length > 0 && (
         <table className="w-full text-xs bg-white dark:bg-gray-800 rounded-md overflow-hidden">
-          <thead className="bg-gray-100 dark:bg-gray-700 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-700 text-left text-gray-600 dark:text-gray-300">
             <tr>
               <th className="px-3 py-2">Fecha</th>
               <th className="px-3 py-2">Por</th>
@@ -956,14 +997,14 @@ function PanelRespaldosNodo({ nodo }: { nodo: NodoRed }) {
           </thead>
           <tbody>
             {respaldos.map((r) => (
-              <tr key={r.id} className="border-t border-gray-100 dark:border-gray-700">
+              <tr key={r.id} className="border-t border-stone-100 dark:border-gray-700">
                 <td className="px-3 py-2">{new Date(r.createdAt).toLocaleString("es-EC")}</td>
                 <td className="px-3 py-2">{r.usuario?.nombre ?? "—"}</td>
                 <td className="px-3 py-2 text-gray-500 dark:text-gray-400">
                   {r.totalInterfaceLists} lista(s) interfaz · {r.totalReglasFiltro} filtro · {r.totalReglasNat} NAT · {r.totalEntradasAddressList} address-list
                 </td>
                 <td className="px-3 py-2 text-right space-x-2 whitespace-nowrap">
-                  <button onClick={() => descargar(r.id)} className="text-slate-700 dark:text-slate-300 hover:underline font-medium">
+                  <button onClick={() => descargar(r.id)} className="text-brand-700 dark:text-brand-300 hover:underline font-medium">
                     Descargar
                   </button>
                   <button
@@ -981,7 +1022,7 @@ function PanelRespaldosNodo({ nodo }: { nodo: NodoRed }) {
       )}
 
       {ultimoResultado && (
-        <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-md p-3 bg-white dark:bg-gray-800">
+        <div className="mt-3 border border-stone-300 dark:border-gray-700 rounded-md p-3 bg-white dark:bg-gray-800">
           <p className="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1.5">
             Resultado de la restauración: {ultimoResultado.exitosos}/{ultimoResultado.total} aplicados
           </p>

@@ -28,37 +28,37 @@ export function ModalDetalleCajaSesion({ cajaSesionId, onCerrar }: Props) {
         <div className="space-y-4">
           <table className="w-full text-sm">
             <tbody>
-              <tr className="border-b border-gray-100 dark:border-gray-700">
+              <tr className="border-b border-stone-100 dark:border-gray-700">
                 <td className="py-1.5 text-gray-500 dark:text-gray-400">Sucursal</td>
                 <td className="py-1.5 text-right font-medium text-gray-800 dark:text-gray-100">{sesion.sucursal.nombre}</td>
               </tr>
-              <tr className="border-b border-gray-100 dark:border-gray-700">
+              <tr className="border-b border-stone-100 dark:border-gray-700">
                 <td className="py-1.5 text-gray-500 dark:text-gray-400">Abierta por</td>
                 <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">
                   {sesion.abiertaPor.nombre} — {new Date(sesion.abiertaEn).toLocaleString("es-EC")}
                 </td>
               </tr>
-              <tr className="border-b border-gray-100 dark:border-gray-700">
+              <tr className="border-b border-stone-100 dark:border-gray-700">
                 <td className="py-1.5 text-gray-500 dark:text-gray-400">Monto inicial</td>
                 <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${sesion.montoInicial}</td>
               </tr>
               {sesion.estado === "CERRADA" ? (
                 <>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <tr className="border-b border-stone-100 dark:border-gray-700">
                     <td className="py-1.5 text-gray-500 dark:text-gray-400">Cerrada por</td>
                     <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">
                       {sesion.cerradaPor?.nombre} — {sesion.cerradaEn && new Date(sesion.cerradaEn).toLocaleString("es-EC")}
                     </td>
                   </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <tr className="border-b border-stone-100 dark:border-gray-700">
                     <td className="py-1.5 text-gray-500 dark:text-gray-400">Esperado</td>
                     <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${sesion.montoEsperado}</td>
                   </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <tr className="border-b border-stone-100 dark:border-gray-700">
                     <td className="py-1.5 text-gray-500 dark:text-gray-400">Contado</td>
                     <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${sesion.montoContado}</td>
                   </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <tr className="border-b border-stone-100 dark:border-gray-700">
                     <td className="py-1.5 text-gray-700 dark:text-gray-200 font-semibold">Diferencia</td>
                     <td className={`py-1.5 text-right font-bold ${colorDiferencia(sesion.diferencia)}`}>${sesion.diferencia}</td>
                   </tr>
@@ -79,7 +79,7 @@ export function ModalDetalleCajaSesion({ cajaSesionId, onCerrar }: Props) {
           </table>
 
           <div>
-            <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">Movimientos manuales</h4>
+            <h4 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-2">Movimientos manuales</h4>
             {sesion.movimientos?.length === 0 && (
               <p className="text-sm text-gray-400 dark:text-gray-500">Sin movimientos manuales</p>
             )}
@@ -95,7 +95,7 @@ export function ModalDetalleCajaSesion({ cajaSesionId, onCerrar }: Props) {
                 </thead>
                 <tbody>
                   {sesion.movimientos.map((m) => (
-                    <tr key={m.id} className="border-t border-gray-100 dark:border-gray-700">
+                    <tr key={m.id} className="border-t border-stone-100 dark:border-gray-700">
                       <td className={`py-1 ${m.tipo === "INGRESO" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
                       </td>

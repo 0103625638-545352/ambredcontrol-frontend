@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Camera } from "lucide-react";
 import {
@@ -17,6 +17,14 @@ import { EscanerCodigoBarras } from "../components/EscanerCodigoBarras";
 import { SelectorBanco } from "../components/SelectorBanco";
 import { useToast } from "../components/ToastProvider";
 import { useMiSucursal } from "../context/AuthContext";
+import {
+  CLASE_CAMPO,
+  CLASE_SOLO_LECTURA,
+  CLASE_ETIQUETA,
+  CLASE_TH,
+  Segmentado,
+  FilaTotal,
+} from "../components/FormatoDocumento";
 
 // Un ítem del carrito: guardamos el producto completo (para mostrar nombre/precio)
 // más la cantidad que el usuario está eligiendo.
@@ -32,6 +40,7 @@ const FORMAS_PAGO = ["EFECTIVO", "TRANSFERENCIA", "TARJETA", "CHEQUE", "OTRO"];
 // Solo estas 3 exigen elegir a qué cuenta bancaria de la empresa llegó el
 // dinero — EFECTIVO y OTRO se quedan igual que siempre (sin cuenta).
 const FORMAS_QUE_EXIGEN_CUENTA = ["TRANSFERENCIA", "TARJETA", "CHEQUE"];
+
 
 // Lo mínimo que necesitamos de la respuesta para la pantalla de confirmación,
 // sea Factura (va al SRI) o NotaVenta (recibo interno, nunca va al SRI).
@@ -60,6 +69,13 @@ export function PuntoDeVentaPage() {
   const [ventaCreada, setVentaCreada] = useState<VentaCreada | null>(null);
   const [busquedaProducto, setBusquedaProducto] = useState("");
   const [mostrarEscaner, setMostrarEscaner] = useState(false);
+  const [mostrarCatalogo, setMostrarCatalogo] = useState(false);
+  // Línea de ingreso de ítem (arriba del detalle): el producto elegido en
+  // el buscador queda acá, con su cantidad, hasta que se presiona Agregar.
+  const [productoEnIngreso, setProductoEnIngreso] = useState<Producto | null>(null);
+  const [cantidadIngreso, setCantidadIngreso] = useState("1");
+  const refBusqueda = useRef<HTMLInputElement>(null);
+  const refCantidad = useRef<HTMLInputElement>(null);
 
   // --- Cobro al momento de la venta: completo, abono parcial, o a crédito.
   // Se resuelve en el mismo paso que crear la factura/nota de venta, en vez
@@ -142,19 +158,37 @@ export function PuntoDeVentaPage() {
     return producto.stockPorBodega.find((s) => s.bodegaId === bodegaId)?.cantidad ?? 0;
   }
 
-  function agregarAlCarrito(producto: Producto) {
+  function agregarAlCarrito(producto: Producto, cantidad = 1) {
+    const cantidadValida = Math.max(1, Math.trunc(cantidad) || 1);
     setCarrito((actual) => {
       const yaExiste = actual.find((item) => item.producto.id === producto.id);
       if (yaExiste) {
         // Si ya está en el carrito, solo aumentamos la cantidad (sin pasar el stock disponible)
         return actual.map((item) =>
           item.producto.id === producto.id
-            ? { ...item, cantidad: Math.min(item.cantidad + 1, stockDisponible(producto)) }
+            ? { ...item, cantidad: Math.min(item.cantidad + cantidadValida, stockDisponible(producto)) }
             : item
         );
       }
-      return [...actual, { producto, cantidad: 1 }];
+      return [...actual, { producto, cantidad: Math.min(cantidadValida, stockDisponible(producto)) }];
     });
+  }
+
+  // Clic en un resultado del buscador: lo carga en la línea de ingreso y
+  // pasa el foco a Cantidad (Enter ahí lo agrega al detalle).
+  function seleccionarParaIngreso(producto: Producto) {
+    setProductoEnIngreso(producto);
+    setBusquedaProducto("");
+    setMostrarCatalogo(false);
+    setTimeout(() => refCantidad.current?.select(), 0);
+  }
+
+  function agregarProductoEnIngreso() {
+    if (!productoEnIngreso) return;
+    agregarAlCarrito(productoEnIngreso, Number(cantidadIngreso));
+    setProductoEnIngreso(null);
+    setCantidadIngreso("1");
+    refBusqueda.current?.focus();
   }
 
   function cambiarCantidad(productoId: number, cantidad: number) {
@@ -193,8 +227,13 @@ export function PuntoDeVentaPage() {
     if (e.key !== "Enter") return;
     const producto = buscarPorCodigoExacto(busquedaProducto);
     if (producto) {
-      agregarAlCarrito(producto);
+      agregarAlCarrito(producto, Number(cantidadIngreso));
       setBusquedaProducto("");
+      setProductoEnIngreso(null);
+      setCantidadIngreso("1");
+    } else if (productosFiltrados?.length === 1 && stockDisponible(productosFiltrados[0]) > 0) {
+      // Un solo resultado por nombre: se carga en la línea de ingreso.
+      seleccionarParaIngreso(productosFiltrados[0]);
     }
   }
 
@@ -371,6 +410,21 @@ export function PuntoDeVentaPage() {
     queryClient.invalidateQueries({ queryKey: ["reporte-cuentas-por-cobrar"] });
   }
 
+  // Atajo de teclado F9 = confirmar, como en los sistemas contables de
+  // escritorio. Sin arreglo de dependencias a propósito: se vuelve a
+  // registrar en cada render para leer siempre el estado más reciente.
+  const puedeConfirmar =
+    carrito.length > 0 && !!clienteId && !!bodegaId && !crearVenta.isPending && !registrandoCobro && cobroValido;
+  useEffect(() => {
+    function manejarTecla(e: KeyboardEvent) {
+      if (e.key !== "F9" || ventaCreada) return;
+      e.preventDefault();
+      if (puedeConfirmar) confirmarVentaConCobro();
+    }
+    window.addEventListener("keydown", manejarTecla);
+    return () => window.removeEventListener("keydown", manejarTecla);
+  });
+
   // --- Pantalla de confirmación después de una venta exitosa ---
   if (ventaCreada) {
     const esFactura = ventaCreada.tipo === "FACTURA";
@@ -378,420 +432,400 @@ export function PuntoDeVentaPage() {
     const rutaPdf = esFactura ? `${base}/ride` : `${base}/recibo`;
     const rutaTermico = `${base}/recibo-termico`;
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-8 max-w-md mx-auto text-center">
-        <div className="text-emerald-600 dark:text-emerald-400 text-4xl mb-2">✓</div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Venta registrada</h2>
-        <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
-          {esFactura ? "Factura" : "Nota de venta"} No. {ventaCreada.secuencial}
-        </p>
-        <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6">${ventaCreada.total}</p>
-        <div className="flex flex-wrap gap-2 justify-center">
+      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700">
+        <div className="px-6 py-5 border-b border-dashed border-stone-300 dark:border-gray-600">
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400 mb-2">
+            ✓ Venta registrada
+          </p>
+          <h2 className="font-serif text-3xl text-gray-900 dark:text-gray-50">
+            {esFactura ? "Factura" : "Nota de venta"}
+          </h2>
+          <p className="font-mono text-sm text-gray-500 dark:text-gray-400">No. {ventaCreada.secuencial}</p>
+        </div>
+        <div className="px-6 py-4 flex items-baseline justify-between border-b border-stone-200 dark:border-gray-700">
+          <span className={CLASE_ETIQUETA}>Total USD</span>
+          <span className="font-mono text-3xl font-semibold tabular-nums text-gray-900 dark:text-gray-50">
+            {ventaCreada.total}
+          </span>
+        </div>
+        <div className="px-6 py-4 grid grid-cols-2 gap-2">
           <button
             onClick={() => abrirPdfEnNuevaPestana(rutaPdf)}
-            className="bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700 dark:hover:bg-slate-600"
+            className="bg-brand-700 text-white px-3 py-2 rounded-sm text-sm font-semibold hover:bg-brand-800"
           >
             Ver {esFactura ? "factura" : "recibo"} (PDF)
           </button>
           <button
             onClick={() => abrirPdfEnNuevaPestana(rutaTermico)}
-            className="bg-white dark:bg-gray-800 text-slate-800 dark:text-slate-200 border border-slate-800 dark:border-slate-500 px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-50 dark:hover:bg-gray-700"
+            className="border border-stone-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-sm text-sm font-semibold hover:bg-stone-50 dark:hover:bg-gray-700"
           >
             Imprimir recibo (80mm)
           </button>
           <button
             onClick={() => setVentaCreada(null)}
-            className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
+            className="col-span-2 flex items-center justify-between border border-stone-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 px-4 py-2.5 rounded-sm text-sm font-semibold hover:bg-stone-50 dark:hover:bg-gray-700"
           >
-            Nueva venta
+            <span>Nueva venta</span>
+            <span aria-hidden>→</span>
           </button>
         </div>
       </div>
     );
   }
 
+  // Desglose de totales como en el RIDE (subtotal por tarifa de IVA, IVA por
+  // tarifa) — misma estimación que totalCarrito, solo que separada por
+  // tarifa para mostrarla. El valor real siempre lo calcula el backend.
+  const aplicaIvaVenta = tipoComprobante === "FACTURA" || aplicaIvaNotaVenta;
+  const subtotalPorTarifa = carrito.reduce<Record<number, number>>((acumulado, item) => {
+    const subtotalItem = (precioMostrado(item.producto) ?? 0) * item.cantidad;
+    const tarifa = aplicaIvaVenta ? parseFloat(item.producto.ivaPorcentaje) : 0;
+    acumulado[tarifa] = (acumulado[tarifa] ?? 0) + subtotalItem;
+    return acumulado;
+  }, {});
+  const tarifasConIva = Object.keys(subtotalPorTarifa)
+    .map(Number)
+    .filter((t) => t > 0)
+    .sort((a, b) => b - a);
+
+  const mostrarResultados = textoBusqueda !== "" || mostrarCatalogo;
+  const precioEnIngreso = productoEnIngreso ? precioMostrado(productoEnIngreso) : null;
+
   return (
-    <div className="grid grid-cols-3 gap-4">
-      {/* Columna izquierda: lista de productos para agregar */}
-      <div className="col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-3">Productos</h2>
-        <div className="flex gap-2 mb-3">
-          <input
-            type="text"
-            placeholder="Buscar por nombre o código, o escanea un código de barras..."
-            value={busquedaProducto}
-            onChange={(e) => setBusquedaProducto(e.target.value)}
-            onKeyDown={manejarEnterBusqueda}
-            className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-            autoFocus
+    <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700">
+      {/* --- Barra superior: tipo de comprobante y estado del documento --- */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+        <div className="flex items-center gap-4">
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-50">Nueva venta</h2>
+          <Segmentado
+            opciones={[
+              { valor: "FACTURA", etiqueta: "Factura" },
+              { valor: "NOTA_VENTA", etiqueta: "Nota de venta" },
+            ]}
+            valor={tipoComprobante}
+            onCambiar={setTipoComprobante}
           />
-          <button
-            type="button"
-            onClick={() => setMostrarEscaner(true)}
-            title="Escanear con la cámara"
-            className="shrink-0 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md px-3 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <Camera strokeWidth={1.75} className="w-5 h-5" />
-          </button>
         </div>
-        {productosFiltrados?.length === 0 && (
-          <p className="text-sm text-gray-400 dark:text-gray-500">Sin resultados para "{busquedaProducto}"</p>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          {productosFiltrados?.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => agregarAlCarrito(p)}
-              disabled={stockDisponible(p) <= 0}
-              className="flex items-center gap-3 text-left border border-gray-200 dark:border-gray-700 rounded-md p-3 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ImagenProducto producto={p} tamano={40} />
-              <div>
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{p.nombre}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {precioMostrado(p) !== null ? `$${precioMostrado(p)!.toFixed(2)}` : "Sin costo"} · Stock: {stockDisponible(p)}
-                </p>
-              </div>
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+            {carrito.length} {carrito.length === 1 ? "ítem" : "ítems"}
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-wider border border-current px-1.5 py-0.5 text-amber-700 dark:text-amber-400">
+            Borrador
+          </span>
         </div>
       </div>
 
-      {/* Columna derecha: carrito */}
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex flex-col">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Carrito</h2>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-          {miSucursal ? `Vendiendo desde: ${miSucursal.nombre}` : "Tu usuario no tiene sucursal asignada"}
-        </p>
-        {bodegas && bodegas.length > 1 && (
+      {tipoComprobante === "NOTA_VENTA" && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+          <span>Recibo interno, no se envía al SRI. Úsalo cuando el cliente no necesita factura formal.</span>
+          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={aplicaIvaNotaVenta}
+              onChange={(e) => setAplicaIvaNotaVenta(e.target.checked)}
+              className="rounded border-stone-300 dark:border-gray-600"
+            />
+            Aplicar IVA (normalmente la nota de venta no lo desglosa)
+          </label>
+        </div>
+      )}
+
+      {/* --- Cabecera del documento: cliente, fecha, sucursal, bodega --- */}
+      <div className="grid grid-cols-[max-content_minmax(0,1fr)_max-content_minmax(0,1fr)] xl:grid-cols-[max-content_minmax(0,1.6fr)_max-content_minmax(0,1fr)_max-content_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-4 py-4">
+        <span className={`${CLASE_ETIQUETA} whitespace-nowrap`}>Cliente</span>
+        <div className="col-span-3 [&>div]:mb-0">
+          <BuscadorCliente
+            clienteId={clienteId}
+            onSeleccionar={(id, cliente) => {
+              setClienteId(id);
+              setClienteSeleccionado(cliente ?? null);
+            }}
+          />
+        </div>
+        <span className={`${CLASE_ETIQUETA} whitespace-nowrap`}>Fecha emisión</span>
+        <div className={`${CLASE_SOLO_LECTURA} font-mono`}>{new Date().toLocaleDateString("es-EC")}</div>
+
+        <span className={`${CLASE_ETIQUETA} whitespace-nowrap`}>Tipo de precio</span>
+        <div className={CLASE_SOLO_LECTURA}>
+          {clienteSeleccionado?.tipoPrecio
+            ? `${clienteSeleccionado.tipoPrecio.nombre} (+${Number(clienteSeleccionado.tipoPrecio.porcentajeGanancia)}%)`
+            : "—"}
+        </div>
+        <span className={`${CLASE_ETIQUETA} whitespace-nowrap`}>Sucursal</span>
+        <div className={CLASE_SOLO_LECTURA}>{miSucursal ? miSucursal.nombre : "Sin sucursal asignada"}</div>
+        <span className={`${CLASE_ETIQUETA} whitespace-nowrap`}>Bodega</span>
+        {bodegas && bodegas.length > 1 ? (
           <select
             value={bodegaId}
             onChange={(e) => setBodegaId(e.target.value ? Number(e.target.value) : "")}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm mb-3"
+            className={CLASE_CAMPO}
           >
-            <option value="">Bodega...</option>
+            <option value="">Selecciona...</option>
             {bodegas.map((b) => (
-              <option key={b.id} value={b.id}>{b.nombre}</option>
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
             ))}
           </select>
+        ) : (
+          <div className={CLASE_SOLO_LECTURA}>{bodegas?.[0]?.nombre ?? "—"}</div>
         )}
+      </div>
 
-        <div className="flex gap-2 mb-3">
-          <button
-            type="button"
-            onClick={() => setTipoComprobante("FACTURA")}
-            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium border transition-colors ${
-              tipoComprobante === "FACTURA"
-                ? "bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-700"
-                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
-            }`}
-          >
-            Factura
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipoComprobante("NOTA_VENTA")}
-            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium border transition-colors ${
-              tipoComprobante === "NOTA_VENTA"
-                ? "bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-700"
-                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
-            }`}
-          >
-            Nota de venta
-          </button>
+      {/* --- Línea de ingreso de ítem (buscador / lector de código de barras) --- */}
+      <div className="mx-4 border border-stone-300 dark:border-gray-700 bg-stone-50 dark:bg-gray-900/40">
+        <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_80px_100px_80px_60px_auto] items-end gap-2 p-2.5">
+          <label className="flex flex-col gap-1 min-w-0">
+            <span className={CLASE_ETIQUETA}>Código / barras / nombre</span>
+            <input
+              ref={refBusqueda}
+              type="text"
+              placeholder="Escribe o escanea..."
+              value={busquedaProducto}
+              onChange={(e) => setBusquedaProducto(e.target.value)}
+              onKeyDown={manejarEnterBusqueda}
+              className={`${CLASE_CAMPO} font-mono`}
+              autoFocus
+            />
+          </label>
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className={CLASE_ETIQUETA}>Descripción</span>
+            <div className={`${CLASE_SOLO_LECTURA} truncate`}>{productoEnIngreso?.nombre ?? "—"}</div>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className={CLASE_ETIQUETA}>Cantidad</span>
+            <input
+              ref={refCantidad}
+              type="number"
+              min={1}
+              value={cantidadIngreso}
+              onChange={(e) => setCantidadIngreso(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") agregarProductoEnIngreso();
+              }}
+              className={`${CLASE_CAMPO} text-right font-mono`}
+            />
+          </label>
+          <div className="flex flex-col gap-1">
+            <span className={CLASE_ETIQUETA}>Precio unit.</span>
+            <div className={`${CLASE_SOLO_LECTURA} text-right font-mono`}>
+              {productoEnIngreso ? (precioEnIngreso !== null ? precioEnIngreso.toFixed(4) : "Sin costo") : "—"}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className={CLASE_ETIQUETA}>Stock</span>
+            <div className={`${CLASE_SOLO_LECTURA} text-right font-mono`}>
+              {productoEnIngreso ? stockDisponible(productoEnIngreso) : "—"}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className={CLASE_ETIQUETA}>IVA</span>
+            <div className={`${CLASE_SOLO_LECTURA} font-mono`}>
+              {productoEnIngreso ? `${Number(productoEnIngreso.ivaPorcentaje)}%` : "—"}
+            </div>
+          </div>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={agregarProductoEnIngreso}
+              disabled={!productoEnIngreso}
+              className="bg-brand-700 text-white px-3 py-1.5 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-40"
+            >
+              Agregar ↵
+            </button>
+            <button
+              type="button"
+              onClick={() => setMostrarEscaner(true)}
+              title="Escanear con la cámara"
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-sm px-2 hover:bg-stone-100 dark:hover:bg-gray-700"
+            >
+              <Camera strokeWidth={1.75} className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMostrarCatalogo((v) => !v)}
+              title="Ver todo el catálogo"
+              className={`border rounded-sm px-2 text-xs font-semibold ${
+                mostrarCatalogo
+                  ? "border-brand-600 text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-900/30"
+                  : "border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-stone-100 dark:hover:bg-gray-700"
+              }`}
+            >
+              Catálogo
+            </button>
+          </div>
         </div>
-        {tipoComprobante === "NOTA_VENTA" && (
-          <div className="mb-3">
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-              Recibo interno, no se envía al SRI. Úsalo cuando el cliente no necesita factura formal.
-            </p>
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={aplicaIvaNotaVenta}
-                onChange={(e) => setAplicaIvaNotaVenta(e.target.checked)}
-                className="rounded border-gray-300 dark:border-gray-600"
-              />
-              Aplicar IVA en esta nota de venta
-            </label>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              En Ecuador, la nota de venta normalmente NO desglosa IVA. Actívalo solo si este caso lo requiere.
-            </p>
+
+        {/* Resultados de la búsqueda — en el flujo de la página (no un
+            desplegable flotante), clic en una fila la carga en la línea de
+            ingreso de arriba. */}
+        {mostrarResultados && (
+          <div className="border-t border-stone-300 dark:border-gray-700 max-h-64 overflow-y-auto bg-white dark:bg-gray-800">
+            {productosFiltrados?.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">
+                Sin resultados para "{busquedaProducto}"
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <tbody>
+                  {productosFiltrados?.map((p) => {
+                    const stock = stockDisponible(p);
+                    const precio = precioMostrado(p);
+                    return (
+                      <tr
+                        key={p.id}
+                        onClick={() => stock > 0 && seleccionarParaIngreso(p)}
+                        className={`border-b border-stone-100 dark:border-gray-700 last:border-b-0 ${
+                          stock > 0
+                            ? "cursor-pointer hover:bg-brand-50 dark:hover:bg-brand-900/20"
+                            : "opacity-40 cursor-not-allowed"
+                        } ${productoEnIngreso?.id === p.id ? "bg-brand-50 dark:bg-brand-900/30" : ""}`}
+                      >
+                        <td className="px-3 py-1.5 w-10">
+                          <ImagenProducto producto={p} tamano={28} />
+                        </td>
+                        <td className="px-2 py-1.5 font-mono text-xs text-gray-500 dark:text-gray-400 w-32">{p.codigo}</td>
+                        <td className="px-2 py-1.5 text-gray-800 dark:text-gray-100">{p.nombre}</td>
+                        <td className="px-2 py-1.5 font-mono text-xs text-right text-gray-500 dark:text-gray-400 w-24">
+                          {stock > 0 ? `Stock ${stock}` : "Agotado"}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono text-right tabular-nums w-24 text-gray-800 dark:text-gray-100">
+                          {precio !== null ? precio.toFixed(2) : "Sin costo"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
+      </div>
 
-        <BuscadorCliente
-          clienteId={clienteId}
-          onSeleccionar={(id, cliente) => {
-            setClienteId(id);
-            setClienteSeleccionado(cliente ?? null);
-          }}
-        />
+      {/* --- Detalle del comprobante --- */}
+      <div className="mx-4 border border-t-0 border-stone-300 dark:border-gray-700 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700">
+              <th className={`${CLASE_TH} w-10`}>#</th>
+              <th className={`${CLASE_TH} w-32`}>Código</th>
+              <th className={CLASE_TH}>Descripción</th>
+              <th className={`${CLASE_TH} w-20 text-right`}>Stock</th>
+              <th className={`${CLASE_TH} w-24 text-right`}>Cantidad</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>Precio unit.</th>
+              <th className={`${CLASE_TH} w-16 text-right`}>IVA</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>Subtotal</th>
+              <th className={`${CLASE_TH} w-10`}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {carrito.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-3 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                  Agrega productos con el buscador, el catálogo o el lector de código de barras.
+                </td>
+              </tr>
+            )}
+            {carrito.map((item, indice) => {
+              const precio = precioMostrado(item.producto);
+              return (
+                <tr key={item.producto.id} className="border-b border-stone-100 dark:border-gray-700/60 last:border-b-0">
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-400">{indice + 1}</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-600 dark:text-gray-300">{item.producto.codigo}</td>
+                  <td className="px-3 py-1.5 text-gray-800 dark:text-gray-100 uppercase text-[13px]">{item.producto.nombre}</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-right text-gray-400">{stockDisponible(item.producto)}</td>
+                  <td className="px-3 py-1 text-right">
+                    <input
+                      type="number"
+                      min={1}
+                      max={stockDisponible(item.producto)}
+                      value={item.cantidad}
+                      onChange={(e) => cambiarCantidad(item.producto.id, Number(e.target.value))}
+                      className="w-16 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm px-1.5 py-0.5 text-right font-mono text-sm focus:outline-none focus:border-brand-600"
+                    />
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-right tabular-nums">
+                    {precio !== null ? (
+                      precio.toFixed(4)
+                    ) : (
+                      <span className="text-red-600 dark:text-red-400 font-sans text-xs">Sin costo</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-right text-gray-500 dark:text-gray-400">
+                    {aplicaIvaVenta ? `${Number(item.producto.ivaPorcentaje)}%` : "0%"}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-right tabular-nums font-medium text-gray-900 dark:text-gray-50">
+                    {((precio ?? 0) * item.cantidad).toFixed(2)}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      onClick={() => quitarDelCarrito(item.producto.id)}
+                      title="Quitar del detalle"
+                      className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-        <div className="flex-1 space-y-2 mb-3">
-          {carrito.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">Carrito vacío</p>}
-          {carrito.map((item) => (
-            <div key={item.producto.id} className="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-700 pb-2">
-              <div>
-                <p className="font-medium text-gray-800 dark:text-gray-100">{item.producto.nombre}</p>
-                <p className="text-gray-500 dark:text-gray-400">
-                  {precioMostrado(item.producto) !== null ? `$${precioMostrado(item.producto)!.toFixed(2)} c/u` : "Sin costo — no se puede vender"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={stockDisponible(item.producto)}
-                  value={item.cantidad}
-                  onChange={(e) => cambiarCantidad(item.producto.id, Number(e.target.value))}
-                  className="w-14 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-1 py-1 text-center"
+      {/* --- Pie: cobro a la izquierda, totales a la derecha --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-4 items-start">
+        <div className="border border-stone-300 dark:border-gray-700">
+          <div className="flex justify-between px-3 py-2 border-b border-stone-300 dark:border-gray-700 bg-stone-50 dark:bg-gray-900/40">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Cobro</span>
+          </div>
+          <div className="p-3 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="flex flex-col gap-1">
+                <span className={CLASE_ETIQUETA}>Modalidad</span>
+                <Segmentado
+                  opciones={[
+                    { valor: "COMPLETO", etiqueta: "Completo" },
+                    { valor: "PARCIAL", etiqueta: "Abono" },
+                    { valor: "PENDIENTE", etiqueta: "Pendiente" },
+                  ]}
+                  valor={modoCobro}
+                  onCambiar={setModoCobro}
                 />
-                <button onClick={() => quitarDelCarrito(item.producto.id)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
-                  ✕
-                </button>
               </div>
-            </div>
-          ))}
-        </div>
 
-        {/* --- Cobro: se resuelve aquí mismo, al confirmar la venta --- */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cobro</p>
-          <div className="flex gap-1 mb-2">
-            {([
-              { valor: "COMPLETO" as const, etiqueta: "Pago completo" },
-              { valor: "PARCIAL" as const, etiqueta: "Abono parcial" },
-              { valor: "PENDIENTE" as const, etiqueta: "Queda pendiente" },
-            ]).map((opcion) => (
-              <button
-                key={opcion.valor}
-                type="button"
-                onClick={() => setModoCobro(opcion.valor)}
-                className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                  modoCobro === opcion.valor
-                    ? "bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-700"
-                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
-                }`}
-              >
-                {opcion.etiqueta}
-              </button>
-            ))}
-          </div>
-
-          {modoCobro !== "COMPLETO" && (
-            <div className="mb-2">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Vence el (opcional)</label>
-              <input
-                type="date"
-                value={fechaVencimiento}
-                onChange={(e) => setFechaVencimiento(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-              />
-            </div>
-          )}
-
-          {modoCobro !== "PENDIENTE" && (
-            <div className="space-y-2">
-              <select
-                value={formaPago}
-                onChange={(e) => {
-                  setFormaPago(e.target.value);
-                  setCuentaBancariaId("");
-                  setBancoOrigenId("");
-                  setNumeroCuentaOrigen("");
-                  setTarjetaUltimosDigitos("");
-                  setTarjetaReferencia("");
-                  setTarjetaLote("");
-                  setChequeNumero("");
-                  setChequeFechaCobro("");
-                }}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-              >
-                {FORMAS_PAGO.map((forma) => (
-                  <option key={forma} value={forma}>
-                    {forma}
-                  </option>
-                ))}
-              </select>
-
-              {exigeCuentaBancaria &&
-                (cuentasBancarias?.length === 0 ? (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    No hay cuentas bancarias configuradas — créalas en Administración &gt; Cuentas Bancarias.
-                  </p>
-                ) : (
+              {modoCobro !== "PENDIENTE" && (
+                <label className="flex flex-col gap-1">
+                  <span className={CLASE_ETIQUETA}>Forma de pago</span>
                   <select
-                    required
-                    value={cuentaBancariaId}
-                    onChange={(e) => setCuentaBancariaId(Number(e.target.value))}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                    value={formaPago}
+                    onChange={(e) => {
+                      setFormaPago(e.target.value);
+                      setCuentaBancariaId("");
+                      setBancoOrigenId("");
+                      setNumeroCuentaOrigen("");
+                      setTarjetaUltimosDigitos("");
+                      setTarjetaReferencia("");
+                      setTarjetaLote("");
+                      setChequeNumero("");
+                      setChequeFechaCobro("");
+                    }}
+                    className={CLASE_CAMPO}
                   >
-                    <option value="" disabled>
-                      Selecciona una cuenta bancaria
-                    </option>
-                    {cuentasBancarias?.map((cb) => (
-                      <option key={cb.id} value={cb.id}>
-                        {cb.nombre} — {cb.banco} {cb.numeroCuenta}
+                    {FORMAS_PAGO.map((forma) => (
+                      <option key={forma} value={forma}>
+                        {forma}
                       </option>
                     ))}
                   </select>
-                ))}
-
-              {formaPago === "TRANSFERENCIA" && (
-                <div className="grid grid-cols-2 gap-2">
-                  <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco de procedencia" />
-                  <input
-                    type="text"
-                    placeholder="N° de cuenta de origen"
-                    value={numeroCuentaOrigen}
-                    onChange={(e) => setNumeroCuentaOrigen(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                  />
-                </div>
-              )}
-              {formaPago === "TARJETA" && (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={4}
-                        placeholder="Últimos 4 dígitos"
-                        value={tarjetaUltimosDigitos}
-                        onChange={(e) => setTarjetaUltimosDigitos(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                      />
-                      <select
-                        value={tarjetaTipo}
-                        onChange={(e) => setTarjetaTipo(e.target.value)}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                      >
-                        <option value="DEBITO">Débito</option>
-                        <option value="CREDITO">Crédito</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="N° de referencia"
-                      value={tarjetaReferencia}
-                      onChange={(e) => setTarjetaReferencia(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="N° de lote"
-                      value={tarjetaLote}
-                      onChange={(e) => setTarjetaLote(e.target.value)}
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                    />
-                  </div>
-                </div>
-              )}
-              {formaPago === "CHEQUE" && (
-                <div className="grid grid-cols-3 gap-2">
-                  <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
-                  <input
-                    type="text"
-                    placeholder="N° de cheque"
-                    value={chequeNumero}
-                    onChange={(e) => setChequeNumero(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                  />
-                  <input
-                    type="date"
-                    title="Fecha de cobro del cheque"
-                    value={chequeFechaCobro}
-                    onChange={(e) => setChequeFechaCobro(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                  />
-                </div>
-              )}
-              {exigeCuentaBancaria && (
-                <input
-                  type="text"
-                  placeholder="Referencia (opcional)"
-                  value={referencia}
-                  onChange={(e) => setReferencia(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                />
-              )}
-
-              {modoCobro === "PARCIAL" && (
-                <>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max={totalCarrito || undefined}
-                    placeholder={`Monto del abono (máx. $${totalCarrito.toFixed(2)})`}
-                    value={montoAbono}
-                    onChange={(e) => setMontoAbono(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-                  />
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-md p-2 space-y-2">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={usarCuotas}
-                        onChange={(e) => setUsarCuotas(e.target.checked)}
-                        className="rounded border-gray-300 dark:border-gray-600"
-                      />
-                      Dividir el saldo restante en cuotas
-                    </label>
-                    {usarCuotas && (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-500 dark:text-gray-400 shrink-0">N° de cuotas</label>
-                          <select
-                            value={numeroCuotas}
-                            onChange={(e) => {
-                              const n = Number(e.target.value);
-                              setNumeroCuotas(n);
-                              setFechasCuotas((actual) => Array.from({ length: n }, (_, i) => actual[i] ?? ""));
-                            }}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                          >
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
-                              <option key={n} value={n}>
-                                {n}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="text-xs text-gray-400 dark:text-gray-500">
-                            Saldo a repartir: ${saldoParaCuotas.toFixed(2)}
-                          </span>
-                        </div>
-                        {cuotasCalculadas.map((c, i) => (
-                          <div key={c.numero} className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500 dark:text-gray-400 w-16 shrink-0">Cuota {c.numero}</span>
-                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-16 shrink-0">
-                              ${c.monto.toFixed(2)}
-                            </span>
-                            <input
-                              type="date"
-                              required
-                              value={fechasCuotas[i] || ""}
-                              onChange={(e) =>
-                                setFechasCuotas((actual) => actual.map((f, idx) => (idx === i ? e.target.value : f)))
-                              }
-                              className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
-                            />
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </>
+                </label>
               )}
 
               {mostrarCalculadoraEfectivo && (
-                <div className="bg-gray-50 dark:bg-gray-900/40 rounded-md p-2 space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-500 dark:text-gray-400 w-14 shrink-0">Recibe</label>
+                <div className="flex flex-col gap-1">
+                  <span className={CLASE_ETIQUETA}>Recibe / Vuelto</span>
+                  <div className="flex items-center gap-3">
                     <input
                       type="number"
                       step="0.01"
@@ -799,43 +833,258 @@ export function PuntoDeVentaPage() {
                       placeholder="0.00"
                       value={montoRecibido}
                       onChange={(e) => setMontoRecibido(e.target.value)}
-                      className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                      className={`${CLASE_CAMPO} text-right font-mono`}
                     />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 w-14 shrink-0">Vuelto</span>
                     <span
-                      className={`text-sm font-semibold ${
-                        vuelto !== null && vuelto < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+                      className={`font-mono font-semibold tabular-nums shrink-0 ${
+                        vuelto !== null && vuelto < 0 ? "text-red-600 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400"
                       }`}
                     >
-                      {vuelto !== null ? `$${vuelto.toFixed(2)}` : "—"}
+                      {vuelto !== null ? vuelto.toFixed(2) : "—"}
                     </span>
                   </div>
                 </div>
               )}
+
+              {modoCobro === "PARCIAL" && (
+                <label className="flex flex-col gap-1">
+                  <span className={CLASE_ETIQUETA}>Monto del abono (máx. {totalCarrito.toFixed(2)})</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={totalCarrito || undefined}
+                    placeholder="0.00"
+                    value={montoAbono}
+                    onChange={(e) => setMontoAbono(e.target.value)}
+                    className={`${CLASE_CAMPO} text-right font-mono`}
+                  />
+                </label>
+              )}
+
+              {modoCobro !== "COMPLETO" && (
+                <label className="flex flex-col gap-1">
+                  <span className={CLASE_ETIQUETA}>Vence el (opcional)</span>
+                  <input
+                    type="date"
+                    value={fechaVencimiento}
+                    onChange={(e) => setFechaVencimiento(e.target.value)}
+                    className={CLASE_CAMPO}
+                  />
+                </label>
+              )}
+
+              {modoCobro !== "PENDIENTE" && exigeCuentaBancaria && (
+                <label className="flex flex-col gap-1 md:col-span-2">
+                  <span className={CLASE_ETIQUETA}>Cuenta de la empresa que recibe</span>
+                  {cuentasBancarias?.length === 0 ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      No hay cuentas bancarias configuradas — créalas en Administración &gt; Cuentas Bancarias.
+                    </p>
+                  ) : (
+                    <select
+                      required
+                      value={cuentaBancariaId}
+                      onChange={(e) => setCuentaBancariaId(Number(e.target.value))}
+                      className={CLASE_CAMPO}
+                    >
+                      <option value="" disabled>
+                        Selecciona una cuenta bancaria
+                      </option>
+                      {cuentasBancarias?.map((cb) => (
+                        <option key={cb.id} value={cb.id}>
+                          {cb.nombre} — {cb.banco} {cb.numeroCuenta}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+              )}
             </div>
-          )}
+
+            {modoCobro !== "PENDIENTE" && formaPago === "TRANSFERENCIA" && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco de procedencia" />
+                <input
+                  type="text"
+                  placeholder="N° de cuenta de origen"
+                  value={numeroCuentaOrigen}
+                  onChange={(e) => setNumeroCuentaOrigen(e.target.value)}
+                  className={CLASE_CAMPO}
+                />
+                <input
+                  type="text"
+                  placeholder="Referencia (opcional)"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  className={CLASE_CAMPO}
+                />
+              </div>
+            )}
+            {modoCobro !== "PENDIENTE" && formaPago === "TARJETA" && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="Últimos 4 dígitos"
+                    value={tarjetaUltimosDigitos}
+                    onChange={(e) => setTarjetaUltimosDigitos(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className={`${CLASE_CAMPO} font-mono`}
+                  />
+                  <select value={tarjetaTipo} onChange={(e) => setTarjetaTipo(e.target.value)} className={`${CLASE_CAMPO} w-auto`}>
+                    <option value="DEBITO">Débito</option>
+                    <option value="CREDITO">Crédito</option>
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Referencia (opcional)"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  className={CLASE_CAMPO}
+                />
+                <input
+                  type="text"
+                  placeholder="N° de referencia del voucher"
+                  value={tarjetaReferencia}
+                  onChange={(e) => setTarjetaReferencia(e.target.value)}
+                  className={CLASE_CAMPO}
+                />
+                <input
+                  type="text"
+                  placeholder="N° de lote"
+                  value={tarjetaLote}
+                  onChange={(e) => setTarjetaLote(e.target.value)}
+                  className={CLASE_CAMPO}
+                />
+              </div>
+            )}
+            {modoCobro !== "PENDIENTE" && formaPago === "CHEQUE" && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
+                <input
+                  type="text"
+                  placeholder="N° de cheque"
+                  value={chequeNumero}
+                  onChange={(e) => setChequeNumero(e.target.value)}
+                  className={`${CLASE_CAMPO} font-mono`}
+                />
+                <input
+                  type="date"
+                  title="Fecha de cobro del cheque"
+                  value={chequeFechaCobro}
+                  onChange={(e) => setChequeFechaCobro(e.target.value)}
+                  className={CLASE_CAMPO}
+                />
+                <input
+                  type="text"
+                  placeholder="Referencia (opcional)"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  className={CLASE_CAMPO}
+                />
+              </div>
+            )}
+
+            {modoCobro === "PARCIAL" && (
+              <div className="border border-stone-200 dark:border-gray-700 p-2.5 space-y-2">
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={usarCuotas}
+                    onChange={(e) => setUsarCuotas(e.target.checked)}
+                    className="rounded border-stone-300 dark:border-gray-600"
+                  />
+                  Dividir el saldo restante en cuotas
+                </label>
+                {usarCuotas && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className={CLASE_ETIQUETA}>N° de cuotas</span>
+                      <select
+                        value={numeroCuotas}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          setNumeroCuotas(n);
+                          setFechasCuotas((actual) => Array.from({ length: n }, (_, i) => actual[i] ?? ""));
+                        }}
+                        className={`${CLASE_CAMPO} w-auto`}
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
+                        Saldo a repartir: {saldoParaCuotas.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5">
+                      {cuotasCalculadas.map((c, i) => (
+                        <div key={c.numero} className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-gray-500 dark:text-gray-400 w-16 shrink-0">Cuota {c.numero}</span>
+                          <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200 w-16 shrink-0 text-right">
+                            {c.monto.toFixed(2)}
+                          </span>
+                          <input
+                            type="date"
+                            required
+                            value={fechasCuotas[i] || ""}
+                            onChange={(e) =>
+                              setFechasCuotas((actual) => actual.map((f, idx) => (idx === i ? e.target.value : f)))
+                            }
+                            className={CLASE_CAMPO}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-          <div className="flex justify-between font-semibold text-gray-800 dark:text-gray-100 mb-3">
-            <span>Total (aprox.)</span>
-            <span>${totalCarrito.toFixed(2)}</span>
+        {/* Totales, en el mismo orden que el RIDE */}
+        <div className="space-y-3">
+          <div className="border border-stone-300 dark:border-gray-700 text-sm">
+            {tarifasConIva.map((tarifa) => (
+              <FilaTotal key={`sub-${tarifa}`} etiqueta={`Subtotal ${tarifa}%`} valor={subtotalPorTarifa[tarifa]} />
+            ))}
+            {tarifasConIva.length === 0 && <FilaTotal etiqueta="Subtotal gravado" valor={0} />}
+            <FilaTotal etiqueta="Subtotal 0%" valor={subtotalPorTarifa[0] ?? 0} />
+            {tarifasConIva.map((tarifa) => (
+              <FilaTotal key={`iva-${tarifa}`} etiqueta={`IVA ${tarifa}%`} valor={(subtotalPorTarifa[tarifa] * tarifa) / 100} />
+            ))}
+            <div className="flex justify-between px-3 py-2.5 border-t-2 border-gray-900 dark:border-gray-200 font-bold text-base text-gray-900 dark:text-gray-50">
+              <span>TOTAL USD</span>
+              <span className="font-mono tabular-nums">{totalCarrito.toFixed(2)}</span>
+            </div>
           </div>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 -mt-1">
+            Valores estimados; el sistema calcula el valor exacto al confirmar.
+          </p>
+
           <button
             onClick={confirmarVentaConCobro}
-            disabled={carrito.length === 0 || !clienteId || !bodegaId || crearVenta.isPending || registrandoCobro || !cobroValido}
-            className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
+            disabled={!puedeConfirmar}
+            className="w-full flex items-center justify-between bg-brand-700 text-white px-4 py-3 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-40"
           >
-            {crearVenta.isPending || registrandoCobro
-              ? "Procesando..."
-              : tipoComprobante === "FACTURA"
-              ? "Confirmar factura"
-              : "Confirmar nota de venta"}
+            <span>
+              {crearVenta.isPending || registrandoCobro
+                ? "Procesando..."
+                : tipoComprobante === "FACTURA"
+                ? "Confirmar factura"
+                : "Confirmar nota de venta"}
+            </span>
+            <span className="font-mono text-xs opacity-80">F9 →</span>
           </button>
           {crearVenta.isError && (
-            <p className="text-red-600 dark:text-red-400 text-sm mt-2">
+            <p className="border-l-2 border-red-600 pl-3 text-red-700 dark:text-red-400 text-sm">
               {(crearVenta.error as any)?.response?.data?.error ?? "Error al crear la venta. Revisa el stock disponible."}
             </p>
           )}

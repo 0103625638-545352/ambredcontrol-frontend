@@ -27,13 +27,10 @@ export function Modal({ titulo, onCerrar, children, ancho = "max-w-md", accionEx
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 shadow-lg w-full ${ancho} max-h-[85vh] overflow-y-auto`}
+        className={`bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 shadow-xl w-full ${ancho} max-h-[85vh] overflow-y-auto`}
       >
-        <div className="flex justify-between items-center gap-3 px-5 py-3.5 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-2.5">
-            <span className="w-1 h-4 rounded-full bg-brand-600 shrink-0" aria-hidden="true" />
-            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">{titulo}</h3>
-          </div>
+        <div className="flex justify-between items-center gap-3 px-5 py-3 border-b border-stone-300 dark:border-gray-700 bg-stone-50 dark:bg-gray-900/40">
+          <h3 className="text-base font-bold text-gray-900 dark:text-gray-50">{titulo}</h3>
           <div className="flex items-center gap-3">
             {accionExtra}
             <button

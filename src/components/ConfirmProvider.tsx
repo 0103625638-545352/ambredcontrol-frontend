@@ -36,13 +36,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           <div className="flex justify-end gap-3">
             <button
               onClick={() => responder(false)}
-              className="px-4 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="px-4 py-1.5 rounded-sm border border-stone-300 dark:border-gray-600 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-gray-700"
             >
               Cancelar
             </button>
             <button
               onClick={() => responder(true)}
-              className="px-4 py-1.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700"
+              className="px-4 py-1.5 rounded-sm text-sm font-semibold bg-red-700 text-white hover:bg-red-800"
             >
               Confirmar
             </button>

@@ -1,32 +1,82 @@
 @import "tailwindcss";
 
-/* Identidad visual del sistema: escala de marca morado/ciruela apagado
-   (inspirada en la paleta de Odoo, sin reutilizar su tono exacto) y una
-   tipografía propia (Inter, cargada desde index.html, no con @import acá).
-   Definir estos tokens acá basta para que Tailwind v4 genere solas las
-   utilidades "bg-brand-600", "text-brand-700", "border-brand-600", etc., y
-   para que --font-sans se aplique a toda la app (heredado por <body> vía
-   Preflight), sin tener que tocar cada archivo. IMPORTANTE: tiene que ir
-   inmediatamente después del @import de Tailwind, arriba de todo — más
-   abajo en el archivo deja de reconocerse como una extensión de tema real.
-   Ojo también con no escribir la secuencia de cierre de comentario dentro
-   del propio comentario (pasó acá antes: describir "bg-brand-x/y-*" con un
-   asterisco pegado a la barra cierra el comentario a la mitad y corrompe
-   todo lo que sigue — fue la causa real de que el color de marca no se
-   viera en ninguna pantalla). */
+/* Identidad visual del sistema: escala de marca "petróleo" (verde azulado
+   apagado, sin copiar el tono exacto de ningún producto de referencia) y
+   tipografía Public Sans + IBM Plex Mono (cargadas desde index.html, no con
+   @import acá). Definir estos tokens acá basta para que Tailwind v4 genere
+   solas las utilidades "bg-brand-600", "text-brand-700", "border-brand-600",
+   "font-mono", etc., y para que --font-sans se aplique a toda la app
+   (heredado por <body> vía Preflight), sin tener que tocar cada archivo.
+   IMPORTANTE: tiene que ir inmediatamente después del @import de Tailwind,
+   arriba de todo — más abajo en el archivo deja de reconocerse como una
+   extensión de tema real. Ojo también con no escribir la secuencia de cierre
+   de comentario dentro del propio comentario (pasó acá antes: describir
+   "bg-brand-x/y-*" con un asterisco pegado a la barra cierra el comentario a
+   la mitad y corrompe todo lo que sigue — fue la causa real de que el color
+   de marca no se viera en ninguna pantalla). */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Para números que necesitan alinearse en columna (totales, RUC/cédula,
+     claves de acceso SRI) — utilidad "font-mono", de uso puntual, no se
+     aplica sola a toda la app. */
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  /* Serif editorial, de uso puntual (titulares del login) — utilidad
+     "font-serif". */
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
 
-  --color-brand-50: #f8f5f8;
-  --color-brand-100: #f0e8f0;
-  --color-brand-200: #ddc9de;
-  --color-brand-300: #c39fc7;
-  --color-brand-400: #a473a8;
-  --color-brand-500: #82527f;
-  --color-brand-600: #66406a;
-  --color-brand-700: #4f3153;
-  --color-brand-800: #3a253d;
-  --color-brand-900: #271929;
+  /* Paleta de marca por defecto: "petróleo" — un verde azulado apagado y
+     técnico en vez del morado/ciruela vivo de antes, buscando alejarse del
+     look "plantilla de IA" (gradientes/morados saturados) del sistema
+     anterior. Quien ya tenía elegido otro color de la lista (ver
+     SelectorColor.tsx / useColorTema.ts) no se ve afectado. */
+  --color-brand-50: #eef6f4;
+  --color-brand-100: #d7ebe7;
+  --color-brand-200: #aedad2;
+  --color-brand-300: #7fc2b7;
+  --color-brand-400: #4fa294;
+  --color-brand-500: #2f8579;
+  --color-brand-600: #1f6f68;
+  --color-brand-700: #175650;
+  --color-brand-800: #123f3a;
+  --color-brand-900: #0c2c29;
+
+  /* Esquinas rectas en TODA la app — Tailwind v4 genera las utilidades
+     "rounded-*" a partir de estas variables, así que definirlas acá achica
+     de una sola vez cada tarjeta, botón, input y tabla del sistema (antes
+     con esquinas muy redondeadas, otro rasgo típico de plantilla genérica)
+     sin tocar archivo por archivo. */
+  --radius-xs: 0.0625rem;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.1875rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.375rem;
+  --radius-2xl: 0.5rem;
+  --radius-3xl: 0.75rem;
+
+  /* Sombras más planas — el sistema se apoya en bordes de 1px para separar
+     bloques (ver tarjetas/tablas) en vez de sombras difusas grandes. */
+  --shadow-xs: 0 1px 1px rgba(15, 23, 22, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 22, 0.06);
+  --shadow-md: 0 1px 3px rgba(15, 23, 22, 0.08);
+  --shadow-lg: 0 2px 6px rgba(15, 23, 22, 0.10);
+  --shadow-xl: 0 4px 10px rgba(15, 23, 22, 0.12);
+}
+
+/* "Morado" era el color de marca por defecto antes de este cambio de
+   identidad visual — se conserva tal cual como override seleccionable
+   (ver useColorTema.ts) para no correrle el color a quien ya lo tenía
+   elegido en su navegador. */
+html[data-color-tema="morado"] {
+  --color-brand-50: #f8f2f9;
+  --color-brand-100: #f0dff3;
+  --color-brand-200: #ddb4e3;
+  --color-brand-300: #c67ed0;
+  --color-brand-400: #ab4dba;
+  --color-brand-500: #8f2f9e;
+  --color-brand-600: #7a2589;
+  --color-brand-700: #601c6b;
+  --color-brand-800: #46144d;
+  --color-brand-900: #2f0d33;
 }
 
 /* Por defecto, Tailwind v4 activa "dark:" según la preferencia del sistema
@@ -34,6 +84,77 @@
    por una clase ".dark" en <html> — así el usuario puede alternarlo con un
    botón, sin depender de la configuración de su sistema. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Selector de color de marca (ver SelectorColor.tsx / useColorTema.ts) —
+   cada usuario elige el que quiera, guardado en su propio navegador
+   (localStorage), igual que el modo oscuro. "morado" es el color por
+   defecto (ya definido arriba en @theme) — estas son las alternativas,
+   pisando las mismas variables --color-brand-* que Tailwind ya usa para
+   generar "bg-brand-600", etc. Como [data-color-tema] tiene más
+   especificidad que ":root" (donde vive @theme), gana sin necesidad de
+   !important, exactamente el mismo mecanismo que ".dark" ya usa más abajo
+   para las variables de gráficos. Todas las escalas están pensadas para que
+   el 600/700 sirva de fondo de botón/header con texto blanco legible.  */
+html[data-color-tema="azul"] {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+}
+html[data-color-tema="verde"] {
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+}
+html[data-color-tema="vino"] {
+  --color-brand-50: #fdf2f4;
+  --color-brand-100: #fce7ea;
+  --color-brand-200: #f9c9d1;
+  --color-brand-300: #f39aab;
+  --color-brand-400: #e8637f;
+  --color-brand-500: #d63a5c;
+  --color-brand-600: #b8244a;
+  --color-brand-700: #931b3c;
+  --color-brand-800: #6f1530;
+  --color-brand-900: #4a0e20;
+}
+html[data-color-tema="naranja"] {
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+}
+html[data-color-tema="turquesa"] {
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+}
 
 /* Transición suave de colores al alternar el tema, para que no se sienta
    como un parpadeo brusco. */
@@ -70,4 +191,25 @@ body {
   --chart-tooltip-bg: #1a1a19;
   --chart-tooltip-border: rgba(255, 255, 255, 0.1);
   --chart-tooltip-text: #ffffff;
+}
+
+/* Impresión acotada a un solo bloque de la pantalla (ver botón "Imprimir"
+   del Reporte del período en VehiculosPage.tsx) — oculta TODO (menú
+   lateral, encabezado, el resto del detalle del vehículo) salvo el
+   elemento marcado con ".imprimir-en-blanco". A propósito detrás de la
+   clase ".imprimiendo" en <body>, que el botón agrega justo antes de
+   window.print() y saca al terminar (evento "afterprint"): así esta regla
+   nunca interfiere con un Ctrl+P normal en cualquier otra pantalla de la
+   app, que no tiene por qué tener nada marcado con ".imprimir-en-blanco". */
+@media print {
+  body.imprimiendo *:not(.imprimir-en-blanco):not(.imprimir-en-blanco *) {
+    visibility: hidden;
+  }
+  body.imprimiendo .imprimir-en-blanco {
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
 }

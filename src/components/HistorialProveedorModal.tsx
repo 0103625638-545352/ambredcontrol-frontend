@@ -45,7 +45,7 @@ export function HistorialProveedorModal({ proveedorId, nombreProveedor, onCerrar
         data.length > 0 && (
           <button
             onClick={exportarExcel}
-            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
+            className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800"
           >
             Exportar a Excel
           </button>
@@ -58,7 +58,7 @@ export function HistorialProveedorModal({ proveedorId, nombreProveedor, onCerrar
       )}
       {data && data.length > 0 && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-3 py-2">Fecha</th>
               <th className="px-3 py-2">Fact. proveedor</th>
@@ -70,7 +70,7 @@ export function HistorialProveedorModal({ proveedorId, nombreProveedor, onCerrar
           </thead>
           <tbody>
             {data.map((item, i) => (
-              <tr key={i} className="border-t border-gray-100 dark:border-gray-700">
+              <tr key={i} className="border-t border-stone-100 dark:border-gray-700">
                 <td className="px-3 py-2">{new Date(item.fecha).toLocaleDateString("es-EC")}</td>
                 <td className="px-3 py-2 font-mono text-xs">{item.documento}</td>
                 <td className="px-3 py-2">{item.producto}</td>

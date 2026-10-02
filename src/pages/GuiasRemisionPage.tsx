@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { api, abrirPdfEnNuevaPestana, type GuiaRemision, type RespuestaPaginada } from "../api/client";
+import { api, abrirPdfEnNuevaPestana, type GuiaRemision } from "../api/client";
 import { EstadoBadge } from "../components/EstadoBadge";
 import { Paginacion } from "../components/Paginacion";
 import { useToast } from "../components/ToastProvider";
+import {
+  useFiltrosListado,
+  BarraBuscadorDocumentos,
+  type RespuestaConResumen,
+} from "../components/BuscadorDocumentos";
+import {
+  Resaltar,
+  EncabezadoListado,
+  PieConteo,
+} from "../components/FormatoDocumento";
 
 const TAMANO_PAGINA = 20;
 
@@ -14,11 +24,13 @@ export function GuiasRemisionPage() {
   const queryClient = useQueryClient();
   const { mostrarToast } = useToast();
   const [pagina, setPagina] = useState(1);
+  // Buscador dinámico del listado (ver components/BuscadorDocumentos.tsx).
+  const filtros = useFiltrosListado(setPagina);
 
   const { data: respuesta, isLoading } = useQuery({
-    queryKey: ["guias-remision", pagina],
+    queryKey: ["guias-remision", pagina, ...filtros.clave],
     queryFn: async () =>
-      (await api.get<RespuestaPaginada<GuiaRemision>>("/guias-remision", { params: { page: pagina, pageSize: TAMANO_PAGINA } })).data,
+      (await api.get<RespuestaConResumen<GuiaRemision>>("/guias-remision", { params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params } })).data,
     placeholderData: keepPreviousData,
   });
   const guias = respuesta?.datos;
@@ -37,17 +49,23 @@ export function GuiasRemisionPage() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Guías de Remisión</h2>
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          Documento de transporte que acompaña la mercadería ya vendida — se genera desde una factura autorizada
-          (botón "Generar guía de remisión" en Facturas).
-        </p>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <EncabezadoListado
+          titulo="Guías de remisión"
+          conteo={respuesta?.paginacion.total}
+          singular="guía"
+          plural="guías"
+          aviso={'Documento de transporte que acompaña la mercadería ya vendida — se genera desde una factura autorizada (botón "Guía de remisión" en Facturas emitidas).'}
+        />
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · número, factura, destinatario, transportista o placa"
+          placeholder="Ej: 000000008, ABC-1234..."
+          opcionesEstado={[{ valor: "CREADA", etiqueta: "Creada" }, { valor: "ENVIADA", etiqueta: "Enviada" }, { valor: "AUTORIZADA", etiqueta: "Autorizada" }, { valor: "RECHAZADA", etiqueta: "Rechazada" }, { valor: "ANULADA", etiqueta: "Anulada" }]}
+          mostrarPago={false}
+        />
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">No.</th>
               <th className="px-4 py-2">Factura</th>
@@ -66,23 +84,23 @@ export function GuiasRemisionPage() {
             {!isLoading && guias?.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  No hay guías de remisión generadas
+                  {filtros.hayFiltros ? "Ningún documento coincide con la búsqueda." : "No hay guías de remisión generadas"}
                 </td>
               </tr>
             )}
             {guias?.map((g) => (
-              <tr key={g.id} className="border-t border-gray-100 dark:border-gray-700">
-                <td className="px-4 py-2 font-mono text-xs">{g.secuencial}</td>
-                <td className="px-4 py-2 font-mono text-xs">{g.factura.secuencial}</td>
-                <td className="px-4 py-2">{g.destinatarioRazonSocial}</td>
-                <td className="px-4 py-2">{g.placa}</td>
+              <tr key={g.id} className="border-t border-stone-100 dark:border-gray-700">
+                <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={g.secuencial} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={g.factura.secuencial} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2"><Resaltar texto={g.destinatarioRazonSocial} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2"><Resaltar texto={g.placa} termino={filtros.busquedaAplicada} /></td>
                 <td className="px-4 py-2">
                   <EstadoBadge estado={g.estado} />
                 </td>
                 <td className="px-4 py-2 text-right space-x-3">
                   <button
                     onClick={() => abrirPdfEnNuevaPestana(`/guias-remision/${g.id}/ride`)}
-                    className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                    className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                   >
                     Ver PDF
                   </button>
@@ -109,6 +127,7 @@ export function GuiasRemisionPage() {
             ))}
           </tbody>
         </table>
+        <PieConteo cantidad={guias?.length ?? 0} etiqueta="GUÍAS EN ESTA PÁGINA" hayFiltros={filtros.hayFiltros} />
         {respuesta && (
           <Paginacion
             page={respuesta.paginacion.page}

@@ -1,26 +1,30 @@
+// Chips de color SÓLIDO (no el tinte suave de antes) — pedido explícito de
+// "colores vivos" para todo el sistema. EstadoBadge se reutiliza en
+// Facturas, Notas de Crédito/Venta, Compras, Caja, Cobros Bancarios, etc.,
+// así que este único archivo modernIZA el badge de estado en TODA la app.
 const coloresEstado: Record<string, string> = {
-  CREADA: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300",
-  ENVIADA: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
-  AUTORIZADA: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-  REGISTRADA: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-  RECHAZADA: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
-  ANULADA: "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
-  CONVERTIDA: "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300",
+  CREADA: "bg-gray-500 text-white",
+  ENVIADA: "bg-sky-600 text-white",
+  AUTORIZADA: "bg-emerald-600 text-white",
+  REGISTRADA: "bg-emerald-600 text-white",
+  RECHAZADA: "bg-red-600 text-white",
+  ANULADA: "bg-gray-400 dark:bg-gray-600 text-white",
+  CONVERTIDA: "bg-sky-600 text-white",
   // Estados de pago (Factura/Compra) — comparten badge con los estados fiscales.
-  PENDIENTE: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
-  PARCIAL: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
-  PAGADA: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
+  PENDIENTE: "bg-amber-500 text-white",
+  PARCIAL: "bg-sky-600 text-white",
+  PAGADA: "bg-emerald-600 text-white",
   // Estados de una CajaSesion (apertura/cierre de caja).
-  ABIERTA: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-  CERRADA: "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
+  ABIERTA: "bg-emerald-600 text-white",
+  CERRADA: "bg-gray-400 dark:bg-gray-600 text-white",
   // Tipo de movimiento en el reporte de Cobros Bancarios: dinero que entra vs sale.
-  COBRO: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-  PAGO: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
+  COBRO: "bg-emerald-600 text-white",
+  PAGO: "bg-red-600 text-white",
 };
 
 export function EstadoBadge({ estado }: { estado: string }) {
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-semibold tracking-wide ${coloresEstado[estado] ?? "bg-gray-100"}`}>
+    <span className={`inline-block px-1.5 py-0.5 rounded-sm font-mono text-[10px] font-semibold uppercase tracking-wider ${coloresEstado[estado] ?? "bg-gray-500 text-white"}`}>
       {estado}
     </span>
   );

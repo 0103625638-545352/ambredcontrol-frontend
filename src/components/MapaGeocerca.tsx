@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { agregarCapasBase } from "../utils/capasMapaBase";
 
 interface Props {
   latitud: string;
@@ -58,10 +59,7 @@ export function MapaGeocerca({ latitud, longitud, radioMetros, onCambiarUbicacio
     const mapa = L.map(contenedorRef.current).setView(centro, tieneUbicacion ? ZOOM_DEFECTO : ZOOM_SIN_UBICACION);
     mapaRef.current = mapa;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(mapa);
+    agregarCapasBase(mapa);
 
     const marcador = L.marker(centro, { draggable: true }).addTo(mapa);
     marcadorRef.current = marcador;

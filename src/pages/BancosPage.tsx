@@ -3,6 +3,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Banco } from "../api/client";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import {
+  CLASE_CAMPO,
+  CLASE_ETIQUETA,
+  CLASE_THEAD,
+  CLASE_CAMPO_CELDA,
+  CLASE_ACCION,
+  CLASE_ACCION_PELIGRO,
+  PanelListado,
+  FilaSinResultados,
+  Resaltar,
+} from "../components/FormatoDocumento";
 
 // Catálogo de bancos EXTERNOS (Pichincha, Guayaquil, Produbanco, etc.) — de
 // dónde vino/salió el dinero de un cobro/pago (banco de procedencia en
@@ -66,60 +78,74 @@ export function BancosPage() {
     if (ok) desactivarBanco.mutate(b.id);
   }
 
+  // Buscador del catálogo (en el navegador: la lista ya viene completa).
+  const filtros = useFiltrosListado(sinPaginacion);
+  const bancosFiltrados = filtrarLocal(bancos, filtros, {
+    textos: (b) => [b.nombre],
+    fecha: (b) => b.createdAt,
+  });
+
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Bancos</h2>
-      <p className="text-sm text-gray-400 dark:text-gray-500 mb-4 max-w-2xl">
-        Catálogo de bancos externos (de dónde viene el dinero de un cobro) — se elige al registrar un pago por
-        transferencia, tarjeta o cheque, para evitar que cada vendedor escriba el nombre del banco a mano.
-      </p>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (nombreNuevo.trim()) crearBanco.mutate();
-        }}
-        className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 flex gap-3 max-w-lg"
+      <PanelListado
+        titulo="Bancos"
+        conteo={bancos?.length}
+        singular="banco"
+        plural="bancos"
+        aviso="Catálogo de bancos externos (de dónde viene el dinero de un cobro). Se elige al registrar un pago por transferencia, tarjeta o cheque, para evitar que cada vendedor escriba el nombre del banco a mano."
       >
-        <input
-          placeholder="Nombre del banco (ej. Banco Pichincha)"
-          required
-          value={nombreNuevo}
-          onChange={(e) => setNombreNuevo(e.target.value)}
-          className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={crearBanco.isPending}
-          className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50 whitespace-nowrap"
+        {/* Línea de ingreso: nuevo banco */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (nombreNuevo.trim()) crearBanco.mutate();
+          }}
+          className="flex items-end gap-2 p-3 border-b border-stone-300 dark:border-gray-700"
         >
-          {crearBanco.isPending ? "Guardando..." : "+ Agregar"}
-        </button>
-      </form>
+          <label className="flex flex-col gap-1 flex-1 min-w-0">
+            <span className={CLASE_ETIQUETA}>Nuevo banco</span>
+            <input
+              placeholder="Ej: Banco Pichincha"
+              required
+              value={nombreNuevo}
+              onChange={(e) => setNombreNuevo(e.target.value)}
+              className={CLASE_CAMPO}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={crearBanco.isPending}
+            className="bg-brand-700 text-white px-4 py-1.5 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-50 whitespace-nowrap"
+          >
+            {crearBanco.isPending ? "Guardando..." : "Agregar ↵"}
+          </button>
+        </form>
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden max-w-lg">
+        <BarraBuscadorDocumentos filtros={filtros} etiquetaBusqueda="Buscar · nombre del banco" placeholder="Ej: Pichincha..." mostrarPago={false} />
+
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className={CLASE_THEAD}>
             <tr>
+              <th className="px-4 py-2 w-10">#</th>
               <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2"></th>
+              <th className="px-4 py-2 w-40"></th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={2} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
+                <td colSpan={3} className="px-4 py-6 text-center text-gray-400 dark:text-gray-500">
+                  Cargando...
+                </td>
               </tr>
             )}
-            {!isLoading && bancos?.length === 0 && (
-              <tr>
-                <td colSpan={2} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Todavía no hay bancos</td>
-              </tr>
+            {!isLoading && bancosFiltrados?.length === 0 && (
+              <FilaSinResultados columnas={3} hayFiltros={filtros.hayFiltros} vacio="Todavía no hay bancos." />
             )}
-            {bancos?.map((b) => (
-              <tr key={b.id} className="border-t border-gray-100 dark:border-gray-700">
+            {bancosFiltrados?.map((b, indice) => (
+              <tr key={b.id} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
                 {bancoEditandoId === b.id ? (
-                  <td colSpan={2} className="px-4 py-2">
+                  <td colSpan={3} className="px-4 py-2">
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -132,40 +158,38 @@ export function BancosPage() {
                         required
                         value={nombreEdit}
                         onChange={(e) => setNombreEdit(e.target.value)}
-                        className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") setBancoEditandoId(null);
+                        }}
+                        className={`${CLASE_CAMPO_CELDA} flex-1 text-left font-sans`}
                       />
                       <button
                         type="submit"
                         disabled={editarBanco.isPending}
-                        className="bg-slate-800 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-slate-700 disabled:opacity-50"
+                        className="bg-brand-700 text-white px-3 py-1 rounded-sm text-xs font-semibold hover:bg-brand-800 disabled:opacity-50"
                       >
                         Guardar
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setBancoEditandoId(null)}
-                        className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
-                      >
+                      <button type="button" onClick={() => setBancoEditandoId(null)} className={CLASE_ACCION}>
                         Cancelar
                       </button>
                     </form>
                   </td>
                 ) : (
                   <>
-                    <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">{b.nombre}</td>
-                    <td className="px-4 py-2 text-right space-x-3">
-                      <button
-                        onClick={() => abrirEdicion(b)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => confirmarDesactivar(b)}
-                        className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium"
-                      >
-                        Desactivar
-                      </button>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-400">{indice + 1}</td>
+                    <td className="px-4 py-2 uppercase text-[13px] font-semibold text-gray-800 dark:text-gray-100">
+                      <Resaltar texto={b.nombre} termino={filtros.busquedaAplicada} />
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => abrirEdicion(b)} className={CLASE_ACCION}>
+                          Editar
+                        </button>
+                        <button onClick={() => confirmarDesactivar(b)} className={CLASE_ACCION_PELIGRO}>
+                          Desactivar
+                        </button>
+                      </div>
                     </td>
                   </>
                 )}
@@ -173,7 +197,18 @@ export function BancosPage() {
             ))}
           </tbody>
         </table>
-      </div>
+        {/* Pie (como el de Facturas emitidas): cuántos bancos hay en lo filtrado */}
+        {bancosFiltrados && bancosFiltrados.length > 0 && (
+          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 py-2.5 border-t-2 border-gray-900 dark:border-gray-200">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {filtros.hayFiltros ? "Según filtro" : "Catálogo completo"}
+            </span>
+            <span className="text-sm font-bold text-gray-900 dark:text-gray-50">
+              BANCOS <span className="font-mono tabular-nums ml-2">{bancosFiltrados.length}</span>
+            </span>
+          </div>
+        )}
+      </PanelListado>
     </div>
   );
 }

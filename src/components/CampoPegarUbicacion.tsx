@@ -44,13 +44,13 @@ export function CampoPegarUbicacion({
 
   return (
     <div className={className}>
-      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Pegar ubicación de WhatsApp (opcional)</label>
+      <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Pegar ubicación de WhatsApp (opcional)</label>
       <input
         type="text"
         placeholder="Pegá acá el mensaje o enlace de ubicación que mandó el cliente"
         value={texto}
         onChange={(e) => manejarCambio(e.target.value)}
-        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+        className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
       />
       {hayUbicacion && (
         <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">

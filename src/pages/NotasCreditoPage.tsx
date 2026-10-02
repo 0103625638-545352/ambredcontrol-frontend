@@ -1,17 +1,28 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { api, abrirPdfEnNuevaPestana, type Factura, type FacturaConDetalle, type NotaCredito, type RespuestaPaginada } from "../api/client";
+import { api, abrirPdfEnNuevaPestana, type Factura, type FacturaConDetalle, type NotaCredito } from "../api/client";
 import { Paginacion } from "../components/Paginacion";
 import { useToast } from "../components/ToastProvider";
+import {
+  useFiltrosListado,
+  BarraBuscadorDocumentos,
+  PieResumenListado,
+  type RespuestaConResumen,
+} from "../components/BuscadorDocumentos";
+import {
+  Resaltar,
+  EncabezadoListado,
+  CLASE_BOTON_ENCABEZADO,
+} from "../components/FormatoDocumento";
 
 const TAMANO_PAGINA = 20;
 
 const coloresEstado: Record<string, string> = {
-  CREADA: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300",
+  CREADA: "bg-stone-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300",
   ENVIADA: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
   AUTORIZADA: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
   RECHAZADA: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
-  ANULADA: "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
+  ANULADA: "bg-stone-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400",
 };
 
 interface Props {
@@ -30,6 +41,8 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
   // Cantidades a devolver por producto: { [productoId]: cantidad }
   const [cantidades, setCantidades] = useState<Record<number, number>>({});
   const [pagina, setPagina] = useState(1);
+  // Buscador dinámico del listado (ver components/BuscadorDocumentos.tsx).
+  const filtros = useFiltrosListado(setPagina);
 
   useEffect(() => {
     if (!facturaIdInicial) return;
@@ -43,9 +56,9 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
   }, [facturaIdInicial]);
 
   const { data: respuesta, isLoading } = useQuery({
-    queryKey: ["notas-credito", pagina],
+    queryKey: ["notas-credito", pagina, ...filtros.clave],
     queryFn: async () =>
-      (await api.get<RespuestaPaginada<NotaCredito>>("/notas-credito", { params: { page: pagina, pageSize: TAMANO_PAGINA } })).data,
+      (await api.get<RespuestaConResumen<NotaCredito>>("/notas-credito", { params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params } })).data,
     placeholderData: keepPreviousData,
   });
   const notas = respuesta?.datos;
@@ -93,26 +106,16 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Notas de Crédito</h2>
-        <button
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
-        >
-          {mostrarFormulario ? "Cancelar" : "+ Nueva nota de crédito"}
-        </button>
-      </div>
-
       {mostrarFormulario && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
             crearNota.mutate();
           }}
-          className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 space-y-3"
+          className="bg-white dark:bg-gray-800 p-4 rounded-sm border border-stone-300 dark:border-gray-700 mb-4 space-y-3"
         >
           <div>
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Factura a corregir (solo autorizadas)</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Factura a corregir (solo autorizadas)</label>
             <select
               required
               value={facturaSeleccionadaId}
@@ -120,7 +123,7 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
                 setFacturaSeleccionadaId(e.target.value ? Number(e.target.value) : "");
                 setCantidades({});
               }}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full"
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm w-full"
             >
               <option value="">Selecciona una factura...</option>
               {facturasAutorizadas.map((f) => (
@@ -137,7 +140,7 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
           </div>
 
           {facturaDetalle && (
-            <div className="border border-gray-200 dark:border-gray-700 rounded-md p-3">
+            <div className="border border-stone-300 dark:border-gray-700 rounded-md p-3">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <p className="text-xs text-gray-600 dark:text-gray-400">
                   Indica cuánto se devuelve de cada producto (déjalo en 0 si no se devuelve):
@@ -167,7 +170,7 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
                     onChange={(e) =>
                       setCantidades({ ...cantidades, [d.productoId]: Number(e.target.value) })
                     }
-                    className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-20 text-right"
+                    className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-20 text-right"
                   />
                 </div>
               ))}
@@ -175,21 +178,21 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
           )}
 
           <div>
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Motivo</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Motivo</label>
             <input
               type="text"
               required
               placeholder="Ej: Devolución de mercadería en mal estado"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full"
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm w-full"
             />
           </div>
 
           <button
             type="submit"
             disabled={crearNota.isPending}
-            className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {crearNota.isPending ? "Guardando..." : "Crear nota de crédito"}
           </button>
@@ -201,9 +204,28 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <EncabezadoListado
+          titulo="Notas de crédito"
+          conteo={respuesta?.paginacion.total}
+          singular="nota de crédito"
+          plural="notas de crédito"
+          aviso="Corrigen o anulan una factura ya autorizada por el SRI (una factura autorizada no se puede anular directamente)."
+          acciones={
+            <button onClick={() => setMostrarFormulario(!mostrarFormulario)} className={CLASE_BOTON_ENCABEZADO}>
+              {mostrarFormulario ? "Cancelar" : "+ Nueva nota de crédito"}
+            </button>
+          }
+        />
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · número, factura, cliente, motivo o clave de acceso"
+          placeholder="Ej: 000000012, devolución, Tornillo..."
+          opcionesEstado={[{ valor: "CREADA", etiqueta: "Creada" }, { valor: "ENVIADA", etiqueta: "Enviada" }, { valor: "AUTORIZADA", etiqueta: "Autorizada" }, { valor: "RECHAZADA", etiqueta: "Rechazada" }, { valor: "ANULADA", etiqueta: "Anulada" }]}
+          mostrarPago={false}
+        />
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">No.</th>
               <th className="px-4 py-2">Factura corregida</th>
@@ -222,25 +244,25 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
             {notas?.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  No hay notas de crédito emitidas
+                  {filtros.hayFiltros ? "Ningún documento coincide con la búsqueda." : "No hay notas de crédito emitidas"}
                 </td>
               </tr>
             )}
             {notas?.map((n) => (
-              <tr key={n.id} className="border-t border-gray-100 dark:border-gray-700">
-                <td className="px-4 py-2 font-mono text-xs">{n.secuencial}</td>
-                <td className="px-4 py-2 font-mono text-xs">{n.factura.secuencial}</td>
-                <td className="px-4 py-2">{n.motivo}</td>
-                <td className="px-4 py-2 text-right">${n.total}</td>
+              <tr key={n.id} className="border-t border-stone-100 dark:border-gray-700">
+                <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={n.secuencial} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={n.factura.secuencial} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2"><Resaltar texto={n.motivo} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2 text-right font-mono tabular-nums">${n.total}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${coloresEstado[n.estado] ?? "bg-gray-100"}`}>
+                  <span className={`px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider font-semibold ${coloresEstado[n.estado] ?? "bg-stone-100"}`}>
                     {n.estado}
                   </span>
                 </td>
                 <td className="px-4 py-2 text-right space-x-3">
                   <button
                     onClick={() => abrirPdfEnNuevaPestana(`/notas-credito/${n.id}/ride`)}
-                    className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                    className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                   >
                     Ver PDF
                   </button>
@@ -258,6 +280,7 @@ export function NotasCreditoPage({ facturaIdInicial, onFacturaIdInicialConsumida
             ))}
           </tbody>
         </table>
+        <PieResumenListado resumen={respuesta?.resumen} hayFiltros={filtros.hayFiltros} />
         {respuesta && (
           <Paginacion
             page={respuesta.paginacion.page}

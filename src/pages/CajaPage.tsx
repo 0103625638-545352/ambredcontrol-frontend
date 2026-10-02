@@ -3,7 +3,28 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { api, type CajaActual, type CajaSesion, type CajaAbierta, type Sucursal, type PuntoDeVenta, type RespuestaPaginada } from "../api/client";
 import { Paginacion } from "../components/Paginacion";
 import { useToast } from "../components/ToastProvider";
-import { useMiSucursal, useEsAdmin } from "../context/AuthContext";
+import { useMiSucursal, useEsAdmin, useAuth } from "../context/AuthContext";
+import { EstadoBadge } from "../components/EstadoBadge";
+import {
+  CLASE_CAMPO,
+  CLASE_SOLO_LECTURA,
+  CLASE_ETIQUETA,
+  CLASE_TH,
+  CLASE_THEAD,
+  MarcoDocumento,
+  Sello,
+  ConteoItems,
+  CabeceraDocumento,
+  EtiquetaCabecera,
+  DetalleDocumento,
+  FilaDetalleVacia,
+  CuadroTotales,
+  FilaTotal,
+  BotonConfirmar,
+  MensajeError,
+  SeccionListado,
+  fechaHoy,
+} from "../components/FormatoDocumento";
 import { ModalMovimientoCaja } from "../components/ModalMovimientoCaja";
 import { ModalCerrarCaja } from "../components/ModalCerrarCaja";
 import { ModalDetalleCajaSesion } from "../components/ModalDetalleCajaSesion";
@@ -29,11 +50,9 @@ function CajasAbiertasAhora() {
   });
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Cajas abiertas ahora</h2>
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <SeccionListado titulo="Cajas abiertas ahora">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Sucursal</th>
               <th className="px-4 py-2">Punto de venta</th>
@@ -54,18 +73,17 @@ function CajasAbiertasAhora() {
               </tr>
             )}
             {abiertas?.map((s) => (
-              <tr key={s.id} className="border-t border-gray-100 dark:border-gray-700">
+              <tr key={s.id} className="border-t border-stone-100 dark:border-gray-700">
                 <td className="px-4 py-2">{s.sucursal.nombre}</td>
                 <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.puntoVenta?.nombre ?? "—"}</td>
                 <td className="px-4 py-2">{s.abiertaPor.nombre}</td>
-                <td className="px-4 py-2 text-xs">{new Date(s.abiertaEn).toLocaleString("es-EC")}</td>
-                <td className="px-4 py-2 text-right font-semibold text-gray-900 dark:text-gray-100">${s.efectivoEsperado}</td>
+                <td className="px-4 py-2 font-mono text-xs">{new Date(s.abiertaEn).toLocaleString("es-EC")}</td>
+                <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-gray-900 dark:text-gray-100">{s.efectivoEsperado}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-    </div>
+    </SeccionListado>
   );
 }
 
@@ -74,6 +92,7 @@ export function CajaPage() {
   const { mostrarToast } = useToast();
   const miSucursal = useMiSucursal();
   const esAdmin = useEsAdmin();
+  const usuario = useAuth();
 
   const [montoInicial, setMontoInicial] = useState("");
   const [puntoVentaId, setPuntoVentaId] = useState<number | "">("");
@@ -137,240 +156,274 @@ export function CajaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Caja</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Sucursal: {miSucursal?.nombre ?? "Tu usuario no tiene sucursal asignada"}
-        </p>
+      {cargandoActual ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+      ) : !sesion ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            abrirCaja.mutate();
+          }}
+        >
+          <MarcoDocumento
+            titulo="Apertura de caja"
+            sello={<Sello>Cerrada</Sello>}
+            aviso="Registra el efectivo con el que arrancas. Desde ese momento, las ventas y compras en efectivo se suman a esta caja."
+          >
+            <CabeceraDocumento>
+              <EtiquetaCabecera>Sucursal</EtiquetaCabecera>
+              <div className={CLASE_SOLO_LECTURA}>{miSucursal?.nombre ?? "Tu usuario no tiene sucursal asignada"}</div>
+              <EtiquetaCabecera>Fecha</EtiquetaCabecera>
+              <div className={`${CLASE_SOLO_LECTURA} font-mono`}>{fechaHoy()}</div>
 
-        {cargandoActual ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
-        ) : !sesion ? (
-          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 max-w-sm">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Abrir caja</h3>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                abrirCaja.mutate();
-              }}
-              className="space-y-3"
-            >
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Efectivo con el que arrancas</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  autoFocus
-                  placeholder="0.00"
-                  value={montoInicial}
-                  onChange={(e) => setMontoInicial(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-                />
-              </div>
-              {puntosVenta && puntosVenta.length > 0 && (
-                <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Punto de venta (opcional)</label>
-                  <select
-                    value={puntoVentaId}
-                    onChange={(e) => setPuntoVentaId(e.target.value ? Number(e.target.value) : "")}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="">Caja de la sucursal completa</option>
-                    {puntosVenta.map((p) => (
-                      <option key={p.id} value={p.id}>{p.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <button
-                type="submit"
-                disabled={abrirCaja.isPending}
-                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-              >
-                {abrirCaja.isPending ? "Abriendo..." : "Abrir caja"}
-              </button>
-              {abrirCaja.isError && (
-                <p className="text-red-600 dark:text-red-400 text-sm">
-                  {(abrirCaja.error as any)?.response?.data?.error ?? "Error al abrir la caja"}
-                </p>
-              )}
-            </form>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-            <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">
-                Caja abierta por {sesion.abiertaPor.nombre}
-                {sesion.puntoVenta && <span className="text-gray-500 dark:text-gray-400 font-normal"> — {sesion.puntoVenta.nombre}</span>}
-                {" — "}
-                {new Date(sesion.abiertaEn).toLocaleString("es-EC")}
-              </h3>
-              <table className="w-full text-sm mb-4">
-                <tbody>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <td className="py-1.5 text-gray-500 dark:text-gray-400">Monto inicial</td>
-                    <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${sesion.montoInicial}</td>
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <td className="py-1.5 text-gray-500 dark:text-gray-400">+ Ventas en efectivo</td>
-                    <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${actual?.componentes?.ventasEfectivo}</td>
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <td className="py-1.5 text-gray-500 dark:text-gray-400">+ Ingresos manuales</td>
-                    <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${actual?.componentes?.ingresosManuales}</td>
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <td className="py-1.5 text-gray-500 dark:text-gray-400">− Compras pagadas en efectivo</td>
-                    <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${actual?.componentes?.comprasEfectivo}</td>
-                  </tr>
-                  <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <td className="py-1.5 text-gray-500 dark:text-gray-400">− Egresos manuales</td>
-                    <td className="py-1.5 text-right text-gray-800 dark:text-gray-100">${actual?.componentes?.egresosManuales}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-1.5 text-gray-700 dark:text-gray-200 font-semibold">Efectivo esperado ahora</td>
-                    <td className="py-1.5 text-right font-bold text-gray-900 dark:text-gray-100">${actual?.efectivoEsperado}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setMostrarModalMovimiento(true)}
-                  className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
+              <EtiquetaCabecera>Cajero</EtiquetaCabecera>
+              <div className={CLASE_SOLO_LECTURA}>{usuario?.nombre ?? "—"}</div>
+              <EtiquetaCabecera>Punto de venta</EtiquetaCabecera>
+              {puntosVenta && puntosVenta.length > 0 ? (
+                <select
+                  value={puntoVentaId}
+                  onChange={(e) => setPuntoVentaId(e.target.value ? Number(e.target.value) : "")}
+                  className={CLASE_CAMPO}
                 >
-                  Registrar movimiento
-                </button>
-                <button
-                  onClick={() => setMostrarModalCierre(true)}
-                  className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700"
-                >
-                  Cerrar caja
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Movimientos de esta caja</h3>
-              {sesion.movimientos?.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">Sin movimientos manuales todavía</p>}
-              {sesion.movimientos && sesion.movimientos.length > 0 && (
-                <ul className="space-y-2 text-sm max-h-64 overflow-y-auto">
-                  {sesion.movimientos.map((m) => (
-                    <li key={m.id} className="flex justify-between border-b border-gray-100 dark:border-gray-700 pb-1.5">
-                      <div>
-                        <p className={m.tipo === "INGRESO" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
-                          {m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{m.motivo}</p>
-                      </div>
-                      <p className="font-medium text-gray-800 dark:text-gray-100">${m.monto}</p>
-                    </li>
+                  <option value="">Caja de la sucursal completa</option>
+                  {puntosVenta.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
                   ))}
-                </ul>
+                </select>
+              ) : (
+                <div className={CLASE_SOLO_LECTURA}>Caja de la sucursal completa</div>
               )}
+            </CabeceraDocumento>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 px-4 pb-4 items-end">
+              <div />
+              <div className="space-y-3">
+                <label className="flex flex-col gap-1">
+                  <span className={CLASE_ETIQUETA}>Efectivo con el que arrancas (USD)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    autoFocus
+                    placeholder="0.00"
+                    value={montoInicial}
+                    onChange={(e) => setMontoInicial(e.target.value)}
+                    className={`${CLASE_CAMPO} text-right font-mono text-base`}
+                  />
+                </label>
+                <BotonConfirmar type="submit" disabled={abrirCaja.isPending}>
+                  {abrirCaja.isPending ? "Abriendo..." : "Abrir caja"}
+                </BotonConfirmar>
+                {abrirCaja.isError && (
+                  <MensajeError>{(abrirCaja.error as any)?.response?.data?.error ?? "Error al abrir la caja"}</MensajeError>
+                )}
+              </div>
+            </div>
+          </MarcoDocumento>
+        </form>
+      ) : (
+        <MarcoDocumento
+          titulo="Caja abierta"
+          sello={
+            <>
+              <ConteoItems cantidad={sesion.movimientos?.length ?? 0} singular="movimiento" plural="movimientos" />
+              <Sello tono="marca">Abierta</Sello>
+            </>
+          }
+        >
+          <CabeceraDocumento>
+            <EtiquetaCabecera>Sucursal</EtiquetaCabecera>
+            <div className={CLASE_SOLO_LECTURA}>{miSucursal?.nombre ?? sesion.sucursal?.nombre ?? "—"}</div>
+            <EtiquetaCabecera>Punto de venta</EtiquetaCabecera>
+            <div className={CLASE_SOLO_LECTURA}>{sesion.puntoVenta?.nombre ?? "Caja de la sucursal completa"}</div>
+
+            <EtiquetaCabecera>Abierta por</EtiquetaCabecera>
+            <div className={CLASE_SOLO_LECTURA}>{sesion.abiertaPor.nombre}</div>
+            <EtiquetaCabecera>Desde</EtiquetaCabecera>
+            <div className={`${CLASE_SOLO_LECTURA} font-mono`}>{new Date(sesion.abiertaEn).toLocaleString("es-EC")}</div>
+          </CabeceraDocumento>
+
+          <div className="mx-4 flex items-center justify-between gap-2 border border-stone-300 dark:border-gray-700 bg-stone-50 dark:bg-gray-900/40 px-3 py-2">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">
+              Movimientos manuales de esta caja
+            </span>
+            <button
+              onClick={() => setMostrarModalMovimiento(true)}
+              className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-semibold"
+            >
+              + Registrar movimiento
+            </button>
+          </div>
+          <DetalleDocumento>
+            <thead>
+              <tr className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700">
+                <th className={`${CLASE_TH} w-10`}>#</th>
+                <th className={`${CLASE_TH} w-40`}>Fecha</th>
+                <th className={`${CLASE_TH} w-28`}>Tipo</th>
+                <th className={CLASE_TH}>Motivo</th>
+                <th className={`${CLASE_TH} w-40`}>Usuario</th>
+                <th className={`${CLASE_TH} w-28 text-right`}>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(sesion.movimientos?.length ?? 0) === 0 && (
+                <FilaDetalleVacia columnas={6}>Sin movimientos manuales todavía.</FilaDetalleVacia>
+              )}
+              {sesion.movimientos?.map((m, indice) => (
+                <tr key={m.id} className="border-b border-stone-100 dark:border-gray-700/60 last:border-b-0">
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-400">{indice + 1}</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(m.fecha).toLocaleString("es-EC")}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <span
+                      className={`font-mono text-[10px] uppercase tracking-wider font-semibold ${
+                        m.tipo === "INGRESO" ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"
+                      }`}
+                    >
+                      {m.tipo === "INGRESO" ? "+ Ingreso" : "− Egreso"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 text-gray-800 dark:text-gray-100">{m.motivo}</td>
+                  <td className="px-3 py-1.5 text-gray-500 dark:text-gray-400">{m.usuario?.nombre ?? "—"}</td>
+                  <td className="px-3 py-1.5 font-mono text-right tabular-nums font-medium text-gray-900 dark:text-gray-50">
+                    {m.monto}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DetalleDocumento>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-4 p-4 items-start">
+            <p className="text-xs text-gray-400 dark:text-gray-500 lg:pt-2">
+              El efectivo esperado se recalcula con cada venta, compra y movimiento en efectivo. Al cerrar, cuentas el
+              efectivo real y el sistema registra la diferencia.
+            </p>
+            <div className="space-y-3">
+              <CuadroTotales etiquetaTotal="EFECTIVO ESPERADO" total={parseFloat(actual?.efectivoEsperado ?? "0")}>
+                <FilaTotal etiqueta="Monto inicial" valor={parseFloat(sesion.montoInicial)} />
+                <FilaTotal etiqueta="+ Ventas en efectivo" valor={parseFloat(actual?.componentes?.ventasEfectivo ?? "0")} />
+                <FilaTotal etiqueta="+ Ingresos manuales" valor={parseFloat(actual?.componentes?.ingresosManuales ?? "0")} />
+                <FilaTotal etiqueta="− Compras en efectivo" valor={parseFloat(actual?.componentes?.comprasEfectivo ?? "0")} />
+                <FilaTotal etiqueta="− Egresos manuales" valor={parseFloat(actual?.componentes?.egresosManuales ?? "0")} />
+              </CuadroTotales>
+              <button
+                onClick={() => setMostrarModalCierre(true)}
+                className="w-full flex items-center justify-between bg-red-700 text-white px-4 py-3 rounded-sm text-sm font-semibold hover:bg-red-800"
+              >
+                <span>Cerrar caja</span>
+                <span className="font-mono text-xs opacity-80">→</span>
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </MarcoDocumento>
+      )}
 
       {esAdmin && <CajasAbiertasAhora />}
 
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Historial de caja</h2>
-          {esAdmin && (
+      <SeccionListado
+        titulo="Historial de caja"
+        accion={
+          esAdmin && (
             <select
               value={filtroSucursalId}
               onChange={(e) => {
                 setFiltroSucursalId(e.target.value ? Number(e.target.value) : "");
                 setPagina(1);
               }}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+              className={`${CLASE_CAMPO} w-auto`}
             >
               <option value="">Todas las sucursales</option>
               {sucursales?.map((s) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
               ))}
             </select>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          )
+        }
+      >
+        <table className="w-full text-sm">
+          <thead className={CLASE_THEAD}>
+            <tr>
+              {esAdmin && <th className="px-4 py-2">Sucursal</th>}
+              <th className="px-4 py-2">Punto de venta</th>
+              <th className="px-4 py-2">Apertura</th>
+              <th className="px-4 py-2">Cierre</th>
+              <th className="px-4 py-2 text-right">Inicial</th>
+              <th className="px-4 py-2 text-right">Esperado</th>
+              <th className="px-4 py-2 text-right">Contado</th>
+              <th className="px-4 py-2 text-right">Diferencia</th>
+              <th className="px-4 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {cargandoHistorial && (
               <tr>
-                {esAdmin && <th className="px-4 py-2">Sucursal</th>}
-                <th className="px-4 py-2">Punto de venta</th>
-                <th className="px-4 py-2">Apertura</th>
-                <th className="px-4 py-2">Cierre</th>
-                <th className="px-4 py-2 text-right">Inicial</th>
-                <th className="px-4 py-2 text-right">Esperado</th>
-                <th className="px-4 py-2 text-right">Contado</th>
-                <th className="px-4 py-2 text-right">Diferencia</th>
-                <th className="px-4 py-2"></th>
+                <td colSpan={esAdmin ? 9 : 8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
+                  Cargando...
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {cargandoHistorial && (
-                <tr>
-                  <td colSpan={esAdmin ? 9 : 8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
-                </tr>
-              )}
-              {!cargandoHistorial && historial?.length === 0 && (
-                <tr>
-                  <td colSpan={esAdmin ? 9 : 8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Todavía no hay sesiones de caja</td>
-                </tr>
-              )}
-              {historial?.map((s) => (
-                <tr key={s.id} className="border-t border-gray-100 dark:border-gray-700">
-                  {esAdmin && <td className="px-4 py-2">{s.sucursal.nombre}</td>}
-                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.puntoVenta?.nombre ?? "—"}</td>
-                  <td className="px-4 py-2 text-xs">
-                    {s.abiertaPor.nombre}
-                    <br />
-                    {new Date(s.abiertaEn).toLocaleString("es-EC")}
-                  </td>
-                  <td className="px-4 py-2 text-xs">
-                    {s.estado === "ABIERTA" ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">— abierta —</span>
-                    ) : (
-                      <>
-                        {s.cerradaPor?.nombre}
-                        <br />
+            )}
+            {!cargandoHistorial && historial?.length === 0 && (
+              <tr>
+                <td colSpan={esAdmin ? 9 : 8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
+                  Todavía no hay sesiones de caja
+                </td>
+              </tr>
+            )}
+            {historial?.map((s) => (
+              <tr key={s.id} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
+                {esAdmin && <td className="px-4 py-2">{s.sucursal.nombre}</td>}
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.puntoVenta?.nombre ?? "—"}</td>
+                <td className="px-4 py-2 text-xs">
+                  {s.abiertaPor.nombre}
+                  <br />
+                  <span className="font-mono text-gray-500 dark:text-gray-400">{new Date(s.abiertaEn).toLocaleString("es-EC")}</span>
+                </td>
+                <td className="px-4 py-2 text-xs">
+                  {s.estado === "ABIERTA" ? (
+                    <EstadoBadge estado="ABIERTA" />
+                  ) : (
+                    <>
+                      {s.cerradaPor?.nombre}
+                      <br />
+                      <span className="font-mono text-gray-500 dark:text-gray-400">
                         {s.cerradaEn && new Date(s.cerradaEn).toLocaleString("es-EC")}
-                      </>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-right">${s.montoInicial}</td>
-                  <td className="px-4 py-2 text-right">{s.montoEsperado !== null ? `$${s.montoEsperado}` : "—"}</td>
-                  <td className="px-4 py-2 text-right">{s.montoContado !== null ? `$${s.montoContado}` : "—"}</td>
-                  <td className={`px-4 py-2 text-right font-medium ${colorDiferencia(s.diferencia)}`}>
-                    {s.diferencia !== null ? `$${s.diferencia}` : "—"}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button
-                      onClick={() => setSesionDetalleId(s.id)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
-                    >
-                      Ver
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {respuestaHistorial && (
-            <Paginacion
-              page={respuestaHistorial.paginacion.page}
-              totalPaginas={respuestaHistorial.paginacion.totalPaginas}
-              total={respuestaHistorial.paginacion.total}
-              onCambiarPagina={setPagina}
-            />
-          )}
-        </div>
-      </div>
+                      </span>
+                    </>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-right font-mono tabular-nums">{s.montoInicial}</td>
+                <td className="px-4 py-2 text-right font-mono tabular-nums">{s.montoEsperado ?? "—"}</td>
+                <td className="px-4 py-2 text-right font-mono tabular-nums">{s.montoContado ?? "—"}</td>
+                <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${colorDiferencia(s.diferencia)}`}>
+                  {s.diferencia ?? "—"}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    onClick={() => setSesionDetalleId(s.id)}
+                    className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-semibold"
+                  >
+                    Ver
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {respuestaHistorial && (
+          <Paginacion
+            page={respuestaHistorial.paginacion.page}
+            totalPaginas={respuestaHistorial.paginacion.totalPaginas}
+            total={respuestaHistorial.paginacion.total}
+            onCambiarPagina={setPagina}
+          />
+        )}
+      </SeccionListado>
 
       {mostrarModalMovimiento && (
         <ModalMovimientoCaja onCerrar={() => setMostrarModalMovimiento(false)} onRegistrado={() => setMostrarModalMovimiento(false)} />

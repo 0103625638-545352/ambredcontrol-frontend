@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { agregarCapasBase } from "../utils/capasMapaBase";
 
 interface Props {
   // Dónde se realizó la marcación.
@@ -30,10 +31,7 @@ export function MapaMarcacion({ latitud, longitud, dentroDeGeocerca, geocerca }:
       doubleClickZoom: false,
     }).setView([latitud, longitud], 16);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(mapa);
+    agregarCapasBase(mapa);
 
     // Color del marcador de la marcación: verde si quedó dentro de la
     // geocerca, rojo si quedó fuera, gris si no se pudo evaluar (sin

@@ -19,7 +19,7 @@ export function SelectorBanco({ value, onChange, label }: Props) {
 
   return (
     <div>
-      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{label}</label>
+      <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">{label}</label>
       {bancos?.length === 0 ? (
         <p className="text-xs text-amber-600 dark:text-amber-400">
           No hay bancos configurados — créalos en Administración &gt; Bancos.
@@ -28,7 +28,7 @@ export function SelectorBanco({ value, onChange, label }: Props) {
         <select
           value={value}
           onChange={(e) => onChange(e.target.value ? Number(e.target.value) : "")}
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+          className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         >
           <option value="">Selecciona un banco...</option>
           {bancos?.map((b) => (

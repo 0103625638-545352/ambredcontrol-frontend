@@ -1,15 +1,17 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
 import { useQuery, useQueries, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { api, type Cliente, type TipoPrecio, type PlanInternet, type NodoRed, type VlanNodo, type RespuestaPaginada } from "../api/client";
+import { api, type Cliente, type TipoPrecio, type PlanInternet, type NodoRed, type VlanNodo, type RespuestaPaginada, OPCIONES_VIGENCIA_MESES } from "../api/client";
 import { Paginacion } from "../components/Paginacion";
 import { HistorialClienteModal } from "../components/HistorialClienteModal";
 import { Modal } from "../components/Modal";
 import { MapaPunto } from "../components/MapaPunto";
 import { CampoPegarUbicacion } from "../components/CampoPegarUbicacion";
-import { useDebounce } from "../hooks/useDebounce";
+import { BotonWhatsapp } from "../components/BotonWhatsapp";
 import { usePermiso } from "../context/AuthContext";
 import { useToast } from "../components/ToastProvider";
 import { urlMapa } from "../utils/parsearUbicacion";
+import { useFiltrosListado, BarraBuscadorDocumentos } from "../components/BuscadorDocumentos";
+import { EncabezadoListado, CLASE_BOTON_ENCABEZADO, CLASE_CAMPO, CLASE_ETIQUETA, Resaltar } from "../components/FormatoDocumento";
 
 const TAMANO_PAGINA = 20;
 
@@ -34,15 +36,22 @@ export function ClientesPage() {
     latitud: "",
     longitud: "",
     fechaContrato: "",
+    fechaInicioServicio: "",
+    vigenciaContratoMeses: "",
   };
   const [form, setForm] = useState(formVacio);
   const [pagina, setPagina] = useState(1);
-  const [busqueda, setBusqueda] = useState("");
-  const busquedaDebounced = useDebounce(busqueda);
+  // Buscador compartido de los listados (en el servidor: la lista pagina).
+  // Estado, nodo y VLAN mantienen su propio estado y van como filtros de la barra.
+  const filtros = useFiltrosListado(setPagina);
   // Filtro opcional por nodo / VLAN — pensado para poder ver "quiénes están
   // en la VLAN 10 del NODO MISICATA", ej. antes de hacer un cambio ahí.
   const [filtroNodoId, setFiltroNodoId] = useState("");
   const [filtroVlanNodoId, setFiltroVlanNodoId] = useState("");
+  // "" = todos, "true" = solo activos, "false" = solo dados de baja — para
+  // poder verificar de un vistazo quién fue dado de baja (ver PATCH
+  // /clientes/:id/dar-de-baja).
+  const [filtroActivo, setFiltroActivo] = useState("");
 
   // Categoría de precio del cliente — determina el margen que se le aplica
   // al facturar EQUIPOS/servicios fuera del plan de internet (que sigue
@@ -91,6 +100,8 @@ export function ClientesPage() {
     latitud: "",
     longitud: "",
     fechaContrato: "",
+    fechaInicioServicio: "",
+    vigenciaContratoMeses: "",
   });
 
   // Controla para cuál cliente se está mostrando el modal de historial
@@ -104,19 +115,20 @@ export function ClientesPage() {
 
   useEffect(() => {
     setPagina(1);
-  }, [busquedaDebounced, filtroNodoId, filtroVlanNodoId]);
+  }, [filtroNodoId, filtroVlanNodoId, filtroActivo]);
 
   const { data: respuesta, isLoading } = useQuery({
-    queryKey: ["clientes", pagina, busquedaDebounced, filtroNodoId, filtroVlanNodoId],
+    queryKey: ["clientes", pagina, ...filtros.clave, filtroNodoId, filtroVlanNodoId, filtroActivo],
     queryFn: async () =>
       (
         await api.get<RespuestaPaginada<Cliente>>("/clientes", {
           params: {
             page: pagina,
             pageSize: TAMANO_PAGINA,
-            q: busquedaDebounced || undefined,
+            ...filtros.params,
             nodoId: filtroNodoId || undefined,
             vlanNodoId: filtroVlanNodoId || undefined,
+            activo: filtroActivo || undefined,
           },
         })
       ).data,
@@ -233,6 +245,8 @@ export function ClientesPage() {
       latitud: c.latitud ?? "",
       longitud: c.longitud ?? "",
       fechaContrato: c.fechaContrato ? c.fechaContrato.slice(0, 10) : "",
+      fechaInicioServicio: c.fechaInicioServicio ? c.fechaInicioServicio.slice(0, 10) : "",
+      vigenciaContratoMeses: c.vigenciaContratoMeses ? String(c.vigenciaContratoMeses) : "",
     });
     setClienteEditandoId(clienteEditandoId === c.id ? null : c.id);
   }
@@ -280,203 +294,292 @@ export function ClientesPage() {
     onError: (error: any) => mostrarToast(error.response?.data?.error ?? "Error al otorgar la prórroga"),
   });
 
+  // Baja definitiva del servicio (distinta de "Suspender", que es
+  // reversible por falta de pago) — solo un cliente a la vez puede tener el
+  // formulario abierto. El backend calcula "vigencia" (¿cumplió el plazo
+  // mínimo pactado?) y la mostramos en el toast de resultado; el monto de
+  // la multa, si procede, lo decide el admin a mano — el sistema no lo calcula.
+  const [clienteBajaId, setClienteBajaId] = useState<number | null>(null);
+  const [formBaja, setFormBaja] = useState({ fechaBaja: "", motivo: "" });
+  const darDeBaja = useMutation({
+    mutationFn: async (id: number) => api.patch(`/clientes/${id}/dar-de-baja`, formBaja),
+    onSuccess: (respuesta) => {
+      const vigencia = respuesta.data?.vigencia;
+      if (vigencia) {
+        mostrarToast(
+          vigencia.cumplioVigencia
+            ? "Cliente dado de baja — cumplió la vigencia mínima pactada, no procede multa."
+            : `Cliente dado de baja — NO cumplió la vigencia mínima (faltaron ${vigencia.diasFaltantes} día(s)): procede evaluar multa por término injustificado/abandono.`
+        );
+      } else {
+        mostrarToast("Cliente dado de baja.");
+      }
+      if (respuesta.data?.advertenciaMikrotik) {
+        mostrarToast(respuesta.data.advertenciaMikrotik);
+      }
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["mikrotik-ips-suspendidas"] });
+      setClienteBajaId(null);
+      setFormBaja({ fechaBaja: "", motivo: "" });
+    },
+    onError: (error: any) => mostrarToast(error.response?.data?.error ?? "Error al dar de baja al cliente"),
+  });
+
+  // Cobra la multa por incumplimiento de vigencia como una Factura real (con
+  // SRI) — ver POST /clientes/:id/imponer-multa. El sistema no calcula el
+  // monto, lo decide el admin acá; solo un cliente a la vez puede tener el
+  // formulario abierto.
+  const [clienteMultaId, setClienteMultaId] = useState<number | null>(null);
+  const [formMulta, setFormMulta] = useState({ monto: "", motivo: "" });
+  const imponerMulta = useMutation({
+    mutationFn: async (id: number) => api.post(`/clientes/${id}/imponer-multa`, { monto: Number(formMulta.monto), motivo: formMulta.motivo || undefined }),
+    onSuccess: (respuesta) => {
+      mostrarToast(`Multa facturada — comprobante ${respuesta.data?.secuencial ?? ""}, enviándose al SRI.`);
+      queryClient.invalidateQueries({ queryKey: ["facturas"] });
+      setClienteMultaId(null);
+      setFormMulta({ monto: "", motivo: "" });
+    },
+    onError: (error: any) => mostrarToast(error.response?.data?.error ?? "Error al imponer la multa"),
+  });
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Clientes</h2>
-        <button
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
-        >
-          {mostrarFormulario ? "Cancelar" : "+ Nuevo cliente"}
-        </button>
-      </div>
-
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          placeholder="Buscar por identificación o razón social..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full"
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <EncabezadoListado
+          titulo="Clientes"
+          conteo={respuesta?.paginacion.total}
+          singular="cliente"
+          plural="clientes"
+          acciones={
+            <button onClick={() => setMostrarFormulario(!mostrarFormulario)} className={CLASE_BOTON_ENCABEZADO}>
+              {mostrarFormulario ? "Cancelar" : "+ Nuevo cliente"}
+            </button>
+          }
         />
-        {puedeMikrotik && (
-          <>
+        {mostrarFormulario && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              crearCliente.mutate();
+            }}
+            className="p-4 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700 grid grid-cols-2 gap-3"
+          >
             <select
-              value={filtroNodoId}
-              onChange={(e) => {
-                setFiltroNodoId(e.target.value);
-                setFiltroVlanNodoId("");
-              }}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm shrink-0"
+              value={form.tipoIdentificacion}
+              onChange={(e) => setForm({ ...form, tipoIdentificacion: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             >
-              <option value="">Todos los nodos</option>
-              {nodos?.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.nombre}
-                </option>
-              ))}
+              <option value="CEDULA">Cédula</option>
+              <option value="RUC">RUC</option>
+              <option value="PASAPORTE">Pasaporte</option>
             </select>
-            <VlanSelect
-              nodoId={filtroNodoId}
-              value={filtroVlanNodoId}
-              onChange={setFiltroVlanNodoId}
-              placeholder="Todas las VLANs"
+            <input
+              placeholder={form.tipoIdentificacion === "RUC" ? "RUC (13 dígitos)" : "Identificación"}
+              required
+              value={form.identificacion}
+              onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
-          </>
-        )}
-      </div>
-
-      {mostrarFormulario && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            crearCliente.mutate();
-          }}
-          className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 grid grid-cols-2 gap-3"
-        >
-          <select
-            value={form.tipoIdentificacion}
-            onChange={(e) => setForm({ ...form, tipoIdentificacion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          >
-            <option value="CEDULA">Cédula</option>
-            <option value="RUC">RUC</option>
-            <option value="PASAPORTE">Pasaporte</option>
-          </select>
-          <input
-            placeholder={form.tipoIdentificacion === "RUC" ? "RUC (13 dígitos)" : "Identificación"}
-            required
-            value={form.identificacion}
-            onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Razón social / Nombres"
-            required
-            value={form.razonSocial}
-            onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
-          />
-          <input
-            type="email"
-            placeholder="Correo electrónico (para enviarle el RIDE/XML)"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Teléfono"
-            value={form.telefono}
-            onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Dirección"
-            value={form.direccion}
-            onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Ciudad"
-            value={form.ciudad}
-            onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <div>
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Tipo de precio (margen al venderle equipos/servicios)
-            </label>
-            <select
-              value={form.tipoPrecioId}
-              onChange={(e) => setForm({ ...form, tipoPrecioId: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            <input
+              placeholder="Razón social / Nombres"
+              required
+              value={form.razonSocial}
+              onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
+            />
+            <input
+              type="email"
+              placeholder="Correo electrónico (para enviarle el RIDE/XML)"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Teléfono"
+              value={form.telefono}
+              onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Dirección"
+              value={form.direccion}
+              onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Ciudad"
+              value={form.ciudad}
+              onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <div>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                Tipo de precio (margen al venderle equipos/servicios)
+              </label>
+              <select
+                value={form.tipoPrecioId}
+                onChange={(e) => setForm({ ...form, tipoPrecioId: e.target.value })}
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+              >
+                {tiposPrecio?.map((tp) => (
+                  <option key={tp.id} value={tp.id}>
+                    {tp.nombre} (+{tp.porcentajeGanancia}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <CampoPegarUbicacion
+              latitud={form.latitud}
+              longitud={form.longitud}
+              onDetectar={(lat, lng) => setForm({ ...form, latitud: lat, longitud: lng })}
+              className="col-span-2"
+            />
+            {puedeMikrotik && (
+              <>
+                <select
+                  value={form.nodoId}
+                  onChange={(e) => setForm({ ...form, nodoId: e.target.value, vlanNodoId: "" })}
+                  className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                >
+                  <option value="">Sin nodo de red</option>
+                  {nodos?.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.nombre}
+                    </option>
+                  ))}
+                </select>
+                <VlanSelect nodoId={form.nodoId} value={form.vlanNodoId} onChange={(v) => setForm({ ...form, vlanNodoId: v })} />
+                <div>
+                  <input
+                    list="ips-libres-nuevo"
+                    placeholder="Dirección IP (opcional — vínculo con el Mikrotik, ej. 10.15.0.9)"
+                    value={form.direccionIp}
+                    onChange={(e) => setForm({ ...form, direccionIp: e.target.value })}
+                    className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                  />
+                  <IpsLibresDatalist id="ips-libres-nuevo" nodoId={form.nodoId} />
+                  <RangoIpSugerido nodoId={form.nodoId} nodos={nodos} />
+                </div>
+                <select
+                  value={form.planInternetId}
+                  onChange={(e) => setForm({ ...form, planInternetId: e.target.value })}
+                  className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
+                >
+                  <option value="">Sin plan de internet</option>
+                  {planesInternet?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} ({p.velocidadSubida}/{p.velocidadBajada})
+                    </option>
+                  ))}
+                </select>
+                <div>
+                  <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                    Fecha de firma del contrato (opcional)
+                  </label>
+                  <input
+                    type="date"
+                    value={form.fechaContrato}
+                    onChange={(e) => setForm({ ...form, fechaContrato: e.target.value })}
+                    className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                  />
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                    El día del mes de esta fecha es su propio día de corte — sin esto, sigue con el día de corte general de la empresa (Ajustes).
+                  </p>
+                </div>
+                <div>
+                  <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                    Fecha de inicio del servicio (opcional)
+                  </label>
+                  <input
+                    type="date"
+                    value={form.fechaInicioServicio}
+                    onChange={(e) => setForm({ ...form, fechaInicioServicio: e.target.value })}
+                    className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                    Vigencia mínima del contrato (opcional)
+                  </label>
+                  <select
+                    value={form.vigenciaContratoMeses}
+                    onChange={(e) => setForm({ ...form, vigenciaContratoMeses: e.target.value })}
+                    className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Sin plazo mínimo pactado</option>
+                    {OPCIONES_VIGENCIA_MESES.map((meses) => (
+                      <option key={meses} value={meses}>
+                        {etiquetaVigencia(meses)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                    Junto con la fecha de inicio, determina si al darlo de baja procede multa por abandono/término injustificado.
+                  </p>
+                </div>
+              </>
+            )}
+            <button
+              type="submit"
+              disabled={crearCliente.isPending}
+              className="col-span-2 bg-brand-700 text-white py-2 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
             >
-              {tiposPrecio?.map((tp) => (
-                <option key={tp.id} value={tp.id}>
-                  {tp.nombre} (+{tp.porcentajeGanancia}%)
-                </option>
-              ))}
-            </select>
-          </div>
-          <CampoPegarUbicacion
-            latitud={form.latitud}
-            longitud={form.longitud}
-            onDetectar={(lat, lng) => setForm({ ...form, latitud: lat, longitud: lng })}
-            className="col-span-2"
-          />
-          {puedeMikrotik && (
+              {crearCliente.isPending ? "Guardando..." : "Guardar cliente"}
+            </button>
+            {crearCliente.isError && (
+              <p className="col-span-2 text-red-600 dark:text-red-400 text-sm">
+                {(crearCliente.error as any)?.response?.data?.error ?? "Error al guardar el cliente"}
+              </p>
+            )}
+          </form>
+        )}
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · cédula/RUC o razón social"
+          placeholder="Ej: 0102030405, Pérez..."
+          mostrarPago={false}
+          extras={
             <>
-              <select
-                value={form.nodoId}
-                onChange={(e) => setForm({ ...form, nodoId: e.target.value, vlanNodoId: "" })}
-                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-              >
-                <option value="">Sin nodo de red</option>
-                {nodos?.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.nombre}
-                  </option>
-                ))}
-              </select>
-              <VlanSelect nodoId={form.nodoId} value={form.vlanNodoId} onChange={(v) => setForm({ ...form, vlanNodoId: v })} />
-              <div>
-                <input
-                  list="ips-libres-nuevo"
-                  placeholder="Dirección IP (opcional — vínculo con el Mikrotik, ej. 10.15.0.9)"
-                  value={form.direccionIp}
-                  onChange={(e) => setForm({ ...form, direccionIp: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-                />
-                <IpsLibresDatalist id="ips-libres-nuevo" nodoId={form.nodoId} />
-                <RangoIpSugerido nodoId={form.nodoId} nodos={nodos} />
-              </div>
-              <select
-                value={form.planInternetId}
-                onChange={(e) => setForm({ ...form, planInternetId: e.target.value })}
-                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
-              >
-                <option value="">Sin plan de internet</option>
-                {planesInternet?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.velocidadSubida}/{p.velocidadBajada})
-                  </option>
-                ))}
-              </select>
-              <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Fecha de firma del contrato (opcional)
-                </label>
-                <input
-                  type="date"
-                  value={form.fechaContrato}
-                  onChange={(e) => setForm({ ...form, fechaContrato: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-                />
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
-                  El día del mes de esta fecha es su propio día de corte — sin esto, sigue con el día de corte general de la empresa (Ajustes).
-                </p>
-              </div>
+              <label className="flex flex-col gap-1 w-40">
+                <span className={CLASE_ETIQUETA}>Estado</span>
+                <select value={filtroActivo} onChange={(e) => setFiltroActivo(e.target.value)} className={CLASE_CAMPO}>
+                  <option value="">Todos</option>
+                  <option value="true">Activos</option>
+                  <option value="false">Dados de baja</option>
+                </select>
+              </label>
+              {puedeMikrotik && (
+                <>
+                  <label className="flex flex-col gap-1 w-44">
+                    <span className={CLASE_ETIQUETA}>Nodo</span>
+                    <select
+                      value={filtroNodoId}
+                      onChange={(e) => {
+                        setFiltroNodoId(e.target.value);
+                        setFiltroVlanNodoId("");
+                      }}
+                      className={CLASE_CAMPO}
+                    >
+                      <option value="">Todos los nodos</option>
+                      {nodos?.map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {n.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 w-44">
+                    <span className={CLASE_ETIQUETA}>VLAN</span>
+                    <VlanSelect nodoId={filtroNodoId} value={filtroVlanNodoId} onChange={setFiltroVlanNodoId} placeholder="Todas las VLANs" />
+                  </label>
+                </>
+              )}
             </>
-          )}
-          <button
-            type="submit"
-            disabled={crearCliente.isPending}
-            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-          >
-            {crearCliente.isPending ? "Guardando..." : "Guardar cliente"}
-          </button>
-          {crearCliente.isError && (
-            <p className="col-span-2 text-red-600 dark:text-red-400 text-sm">
-              {(crearCliente.error as any)?.response?.data?.error ?? "Error al guardar el cliente"}
-            </p>
-          )}
-        </form>
-      )}
-
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+          }
+        />
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <ThOrdenable etiqueta="Identificación" columna="identificacion" ordenColumna={ordenColumna} ordenDireccion={ordenDireccion} onClick={alternarOrden} />
               <ThOrdenable etiqueta="Razón Social" columna="razonSocial" ordenColumna={ordenColumna} ordenDireccion={ordenDireccion} onClick={alternarOrden} />
@@ -500,16 +603,16 @@ export function ClientesPage() {
             {!isLoading && clientes?.length === 0 && (
               <tr>
                 <td colSpan={puedeMikrotik ? 7 : 5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  {busquedaDebounced ? `Sin resultados para "${busquedaDebounced}"` : "No hay clientes"}
+                  {filtros.hayFiltros || filtroActivo || filtroNodoId ? "Ningún cliente coincide con la búsqueda." : "No hay clientes"}
                 </td>
               </tr>
             )}
             {clientesOrdenados?.map((c) => (
               <Fragment key={c.id}>
-                <tr className="border-t border-gray-100 dark:border-gray-700">
-                  <td className="px-4 py-2">{c.identificacion}</td>
+                <tr className={`border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30 ${c.activo === false ? "text-gray-400 dark:text-gray-500" : ""}`}>
+                  <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={c.identificacion} termino={filtros.busquedaAplicada} /></td>
                   <td className="px-4 py-2">
-                    {c.razonSocial}
+                    <Resaltar texto={c.razonSocial} termino={filtros.busquedaAplicada} />
                     {c.latitud && c.longitud && (
                       <button
                         onClick={() => setClienteMapaId(c.id)}
@@ -519,11 +622,33 @@ export function ClientesPage() {
                         📍
                       </button>
                     )}
+                    {c.activo === false && (
+                      <div
+                        className="text-[10px] text-red-600 dark:text-red-400 font-medium mt-0.5"
+                        title={c.motivoBaja ?? undefined}
+                      >
+                        Dado de baja{c.fechaBaja ? ` (${new Date(c.fechaBaja).toLocaleDateString("es-EC")})` : ""}
+                      </div>
+                    )}
+                    {c.vigencia && (
+                      <div
+                        className={`text-[10px] font-medium mt-0.5 ${c.vigencia.cumplioVigencia ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
+                      >
+                        {c.vigencia.cumplioVigencia
+                          ? "Cumplió vigencia mínima"
+                          : `Faltan ${c.vigencia.diasFaltantes} día(s) para la vigencia mínima`}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
                     {c.email ?? <span className="text-gray-300 dark:text-gray-600 italic">sin correo</span>}
                   </td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{c.telefono ?? "—"}</td>
+                  <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5">
+                      {c.telefono ?? "—"}
+                      <BotonWhatsapp telefono={c.telefono} mensaje={`Hola ${c.razonSocial}, te escribimos de tu proveedor de internet.`} />
+                    </div>
+                  </td>
                   {puedeMikrotik && (
                     <>
                       <td className="px-4 py-2">
@@ -582,7 +707,7 @@ export function ClientesPage() {
                                     <select
                                       value={diasProrroga}
                                       onChange={(e) => setDiasProrroga(Number(e.target.value))}
-                                      className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-1 py-0.5 text-xs"
+                                      className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-1 py-0.5 text-xs"
                                     >
                                       <option value={1}>1 día</option>
                                       <option value={2}>2 días</option>
@@ -616,21 +741,149 @@ export function ClientesPage() {
                   <td className="px-4 py-2 text-right space-x-3">
                     <button
                       onClick={() => setClienteHistorialId(c.id)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       Historial
                     </button>
                     <button
                       onClick={() => abrirEdicion(c)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       {clienteEditandoId === c.id ? "Cancelar" : "Editar"}
                     </button>
+                    {c.activo !== false && (
+                      <button
+                        onClick={() => {
+                          setClienteBajaId(clienteBajaId === c.id ? null : c.id);
+                          setFormBaja({ fechaBaja: "", motivo: "" });
+                        }}
+                        className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium"
+                      >
+                        {clienteBajaId === c.id ? "Cancelar" : "Dar de baja"}
+                      </button>
+                    )}
+                    {c.vigencia && !c.vigencia.cumplioVigencia && (
+                      <button
+                        onClick={() => {
+                          setClienteMultaId(clienteMultaId === c.id ? null : c.id);
+                          setFormMulta({ monto: "", motivo: "" });
+                        }}
+                        className="text-amber-600 dark:text-amber-400 hover:underline text-xs font-medium"
+                      >
+                        {clienteMultaId === c.id ? "Cancelar" : "Imponer multa"}
+                      </button>
+                    )}
                   </td>
                 </tr>
 
+                {clienteMultaId === c.id && (
+                  <tr className="bg-amber-50 dark:bg-amber-950/20">
+                    <td colSpan={puedeMikrotik ? 7 : 5} className="px-4 py-3">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          imponerMulta.mutate(c.id);
+                        }}
+                        className="flex flex-wrap items-end gap-2"
+                      >
+                        <div>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Monto de la multa ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            required
+                            autoFocus
+                            value={formMulta.monto}
+                            onChange={(e) => setFormMulta({ ...formMulta, monto: e.target.value })}
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm w-28"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Motivo (opcional, queda en Auditoría)</label>
+                          <input
+                            placeholder="Ej. abandono antes de cumplir la vigencia pactada"
+                            value={formMulta.motivo}
+                            onChange={(e) => setFormMulta({ ...formMulta, motivo: e.target.value })}
+                            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={imponerMulta.isPending}
+                          className="bg-amber-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+                        >
+                          {imponerMulta.isPending ? "Facturando..." : "Confirmar y facturar"}
+                        </button>
+                        <p className="basis-full text-[11px] text-gray-500 dark:text-gray-400">
+                          Genera una Factura real por este monto a nombre de {c.razonSocial}, con IVA, firmada y enviada al SRI — no se puede deshacer una vez enviada (correspondería una Nota de Crédito).
+                        </p>
+                        {imponerMulta.isError && (
+                          <p className="basis-full text-red-600 dark:text-red-400 text-xs">
+                            {(imponerMulta.error as any)?.response?.data?.error ?? "Error al imponer la multa"}
+                          </p>
+                        )}
+                      </form>
+                    </td>
+                  </tr>
+                )}
+
+                {clienteBajaId === c.id && (
+                  <tr className="bg-red-50 dark:bg-red-950/20">
+                    <td colSpan={puedeMikrotik ? 7 : 5} className="px-4 py-3">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          darDeBaja.mutate(c.id);
+                        }}
+                        className="flex flex-wrap items-end gap-2"
+                      >
+                        <div>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Fecha de baja</label>
+                          <input
+                            type="date"
+                            required
+                            autoFocus
+                            value={formBaja.fechaBaja}
+                            onChange={(e) => setFormBaja({ ...formBaja, fechaBaja: e.target.value })}
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Motivo (opcional)</label>
+                          <input
+                            placeholder="Ej. abandono del servicio, cambio de proveedor..."
+                            value={formBaja.motivo}
+                            onChange={(e) => setFormBaja({ ...formBaja, motivo: e.target.value })}
+                            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={darDeBaja.isPending}
+                          className="bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {darDeBaja.isPending ? "Guardando..." : "Confirmar baja"}
+                        </button>
+                        {c.vigencia && (
+                          <p className="basis-full text-[11px] text-gray-500 dark:text-gray-400">
+                            {c.vigencia.cumplioVigencia
+                              ? "Con la fecha de baja de hoy, ya cumplió la vigencia mínima — no procedería multa."
+                              : `Con la fecha de baja de hoy, aún faltan ${c.vigencia.diasFaltantes} día(s) para la vigencia mínima — procedería evaluar multa por abandono/término injustificado.`}
+                          </p>
+                        )}
+                        {darDeBaja.isError && (
+                          <p className="basis-full text-red-600 dark:text-red-400 text-xs">
+                            {(darDeBaja.error as any)?.response?.data?.error ?? "Error al dar de baja al cliente"}
+                          </p>
+                        )}
+                      </form>
+                    </td>
+                  </tr>
+                )}
+
                 {clienteEditandoId === c.id && (
-                  <tr className="bg-slate-50 dark:bg-gray-700/40">
+                  <tr className="bg-stone-50 dark:bg-gray-700/40">
                     <td colSpan={puedeMikrotik ? 7 : 5} className="px-4 py-3">
                       <form
                         onSubmit={(e) => {
@@ -645,41 +898,41 @@ export function ClientesPage() {
                           autoFocus
                           value={editForm.razonSocial}
                           onChange={(e) => setEditForm({ ...editForm, razonSocial: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
                         />
                         <input
                           type="email"
                           placeholder="Correo electrónico"
                           value={editForm.email}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <input
                           placeholder="Teléfono"
                           value={editForm.telefono}
                           onChange={(e) => setEditForm({ ...editForm, telefono: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <input
                           placeholder="Dirección"
                           value={editForm.direccion}
                           onChange={(e) => setEditForm({ ...editForm, direccion: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <input
                           placeholder="Ciudad"
                           value={editForm.ciudad}
                           onChange={(e) => setEditForm({ ...editForm, ciudad: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
                             Tipo de precio (margen al venderle equipos/servicios)
                           </label>
                           <select
                             value={editForm.tipoPrecioId}
                             onChange={(e) => setEditForm({ ...editForm, tipoPrecioId: e.target.value })}
-                            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                           >
                             {tiposPrecio?.map((tp) => (
                               <option key={tp.id} value={tp.id}>
@@ -699,7 +952,7 @@ export function ClientesPage() {
                             <select
                               value={editForm.nodoId}
                               onChange={(e) => setEditForm({ ...editForm, nodoId: e.target.value, vlanNodoId: "" })}
-                              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                             >
                               <option value="">Sin nodo de red</option>
                               {nodos?.map((n) => (
@@ -715,7 +968,7 @@ export function ClientesPage() {
                                 placeholder="Dirección IP (opcional, ej. 10.15.0.9)"
                                 value={editForm.direccionIp}
                                 onChange={(e) => setEditForm({ ...editForm, direccionIp: e.target.value })}
-                                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                               />
                               <IpsLibresDatalist id={`ips-libres-editar-${c.id}`} nodoId={editForm.nodoId} />
                               <RangoIpSugerido nodoId={editForm.nodoId} nodos={nodos} />
@@ -723,7 +976,7 @@ export function ClientesPage() {
                             <select
                               value={editForm.planInternetId}
                               onChange={(e) => setEditForm({ ...editForm, planInternetId: e.target.value })}
-                              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+                              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
                             >
                               <option value="">Sin plan de internet</option>
                               {planesInternet?.map((p) => (
@@ -733,18 +986,46 @@ export function ClientesPage() {
                               ))}
                             </select>
                             <div className="col-span-2">
-                              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
                                 Fecha de firma del contrato (opcional)
                               </label>
                               <input
                                 type="date"
                                 value={editForm.fechaContrato}
                                 onChange={(e) => setEditForm({ ...editForm, fechaContrato: e.target.value })}
-                                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                               />
                               <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
                                 El día del mes de esta fecha es su propio día de corte — sin esto, sigue con el día de corte general de la empresa.
                               </p>
+                            </div>
+                            <div>
+                              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                                Fecha de inicio del servicio
+                              </label>
+                              <input
+                                type="date"
+                                value={editForm.fechaInicioServicio}
+                                onChange={(e) => setEditForm({ ...editForm, fechaInicioServicio: e.target.value })}
+                                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
+                                Vigencia mínima del contrato
+                              </label>
+                              <select
+                                value={editForm.vigenciaContratoMeses}
+                                onChange={(e) => setEditForm({ ...editForm, vigenciaContratoMeses: e.target.value })}
+                                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                              >
+                                <option value="">Sin plazo mínimo pactado</option>
+                                {OPCIONES_VIGENCIA_MESES.map((meses) => (
+                                  <option key={meses} value={meses}>
+                                    {etiquetaVigencia(meses)}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                           </>
                         )}
@@ -752,14 +1033,14 @@ export function ClientesPage() {
                           <button
                             type="submit"
                             disabled={editarCliente.isPending}
-                            className="flex-1 bg-slate-800 text-white py-1.5 rounded-md text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+                            className="flex-1 bg-brand-700 text-white py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
                           >
                             {editarCliente.isPending ? "Guardando..." : "Guardar cambios"}
                           </button>
                           <button
                             type="button"
                             onClick={() => setClienteEditandoId(null)}
-                            className="flex-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
+                            className="flex-1 bg-stone-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
                           >
                             Cancelar
                           </button>
@@ -777,6 +1058,7 @@ export function ClientesPage() {
             ))}
           </tbody>
         </table>
+        </div>
         {respuesta && (
           <Paginacion
             page={respuesta.paginacion.page}
@@ -817,6 +1099,13 @@ export function ClientesPage() {
         })()}
     </div>
   );
+}
+
+// Texto legible para cada plazo de OPCIONES_VIGENCIA_MESES (6/12/24/36).
+function etiquetaVigencia(meses: number): string {
+  if (meses === 6) return "6 meses";
+  if (meses === 12) return "1 año";
+  return `${meses / 12} años`;
 }
 
 // Debajo del campo de IP, un recordatorio del rango configurado para el
@@ -881,7 +1170,7 @@ function VlanSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm shrink-0"
+      className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm shrink-0"
     >
       <option value="">{placeholder}</option>
       {vlans.map((v) => (

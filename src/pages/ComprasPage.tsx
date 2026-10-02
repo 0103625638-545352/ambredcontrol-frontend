@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { api, abrirPdfEnNuevaPestana, type Producto, type Compra, type Bodega, type RespuestaPaginada } from "../api/client";
-import { ImagenProducto } from "../components/ImagenProducto";
+import { api, abrirPdfEnNuevaPestana, type Producto, type Compra, type Bodega } from "../api/client";
 import { BuscadorProveedor } from "../components/BuscadorProveedor";
 import { EstadoBadge } from "../components/EstadoBadge";
 import { Paginacion } from "../components/Paginacion";
@@ -11,6 +10,35 @@ import { ModalRegistrarPago } from "../components/ModalRegistrarPago";
 import { ModalHistorialPagos } from "../components/ModalHistorialPagos";
 import { ModalGenerarRetencion } from "../components/ModalGenerarRetencion";
 import { usePermiso, useMiSucursal } from "../context/AuthContext";
+import {
+  CLASE_CAMPO,
+  CLASE_SOLO_LECTURA,
+  CLASE_ETIQUETA,
+  CLASE_TH,
+  CLASE_THEAD,
+  CLASE_CAMPO_CELDA,
+  MarcoDocumento,
+  Sello,
+  ConteoItems,
+  CabeceraDocumento,
+  EtiquetaCabecera,
+  BuscadorProductosDocumento,
+  DetalleDocumento,
+  FilaDetalleVacia,
+  RecuadroDocumento,
+  CuadroTotales,
+  BotonConfirmar,
+  MensajeError,
+  SeccionListado,
+  fechaHoy,
+  Resaltar,
+} from "../components/FormatoDocumento";
+import {
+  useFiltrosListado,
+  BarraBuscadorDocumentos,
+  PieResumenListado,
+  type RespuestaConResumen,
+} from "../components/BuscadorDocumentos";
 
 const TAMANO_PAGINA = 20;
 
@@ -51,6 +79,8 @@ export function ComprasPage() {
   const [fechasCuotas, setFechasCuotas] = useState<string[]>(["", ""]);
   const [busquedaProducto, setBusquedaProducto] = useState("");
   const [pagina, setPagina] = useState(1);
+  // Buscador dinámico del listado (ver components/BuscadorDocumentos.tsx).
+  const filtros = useFiltrosListado(setPagina);
   const [compraPagoId, setCompraPagoId] = useState<number | null>(null);
   const [compraVerPagosId, setCompraVerPagosId] = useState<number | null>(null);
   const [compraRetencionId, setCompraRetencionId] = useState<number | null>(null);
@@ -91,9 +121,9 @@ export function ComprasPage() {
   );
 
   const { data: respuestaCompras, isLoading: cargandoCompras } = useQuery({
-    queryKey: ["compras", pagina],
+    queryKey: ["compras", pagina, ...filtros.clave],
     queryFn: async () =>
-      (await api.get<RespuestaPaginada<Compra>>("/compras", { params: { page: pagina, pageSize: TAMANO_PAGINA } })).data,
+      (await api.get<RespuestaConResumen<Compra>>("/compras", { params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params } })).data,
     placeholderData: keepPreviousData,
   });
   const compras = respuestaCompras?.datos;
@@ -239,110 +269,207 @@ export function ComprasPage() {
     onError: (error: any) => mostrarToast(error.response?.data?.error ?? "Error al consultar autorización"),
   });
 
+  const puedeRegistrar =
+    carritoValido &&
+    !!proveedorId &&
+    !!numeroFactura &&
+    !!bodegaId &&
+    !!sustentoTributario.trim() &&
+    cuotasValidas &&
+    !registrarCompra.isPending;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Registrar compra</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Columna izquierda: buscar productos para agregar */}
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Productos</h3>
-            <input
-              type="text"
-              placeholder="Buscar por nombre, código, marca o modelo..."
-              value={busquedaProducto}
-              onChange={(e) => setBusquedaProducto(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full mb-3"
-            />
-            {productosFiltrados?.length === 0 && (
-              <p className="text-sm text-gray-400 dark:text-gray-500">Sin resultados para "{busquedaProducto}"</p>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              {productosFiltrados?.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => agregarAlCarrito(p)}
-                  className="flex items-center gap-3 text-left border border-gray-200 dark:border-gray-700 rounded-md p-3 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <ImagenProducto producto={p} tamano={40} />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{p.nombre}</p>
-                    {(p.marca || p.modelo) && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {[p.marca, p.modelo].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Stock actual: {p.stockActual}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
+      <MarcoDocumento
+        titulo="Registrar compra"
+        sello={
+          <>
+            <ConteoItems cantidad={carrito.length} />
+            <Sello>Borrador</Sello>
+          </>
+        }
+      >
+        <CabeceraDocumento>
+          <EtiquetaCabecera>Proveedor</EtiquetaCabecera>
+          <div className="col-span-3 [&>div]:mb-0">
+            <BuscadorProveedor proveedorId={proveedorId} onSeleccionar={setProveedorId} />
           </div>
 
-          {/* Columna derecha: datos de la compra */}
-          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex flex-col">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Datos de la compra</h3>
+          <EtiquetaCabecera>Fact. proveedor</EtiquetaCabecera>
+          <input
+            type="text"
+            placeholder="001-001-000000123"
+            value={numeroFactura}
+            onChange={(e) => setNumeroFactura(e.target.value)}
+            className={`${CLASE_CAMPO} font-mono`}
+          />
+          <EtiquetaCabecera>Fecha registro</EtiquetaCabecera>
+          <div className={`${CLASE_SOLO_LECTURA} font-mono`}>{fechaHoy()}</div>
 
-            <BuscadorProveedor proveedorId={proveedorId} onSeleccionar={setProveedorId} />
+          <EtiquetaCabecera>Sustento SRI</EtiquetaCabecera>
+          <input
+            type="text"
+            placeholder="Ej: 01, 06..."
+            required
+            value={sustentoTributario}
+            onChange={(e) => setSustentoTributario(e.target.value)}
+            className={`${CLASE_CAMPO} font-mono`}
+          />
+          <EtiquetaCabecera>Vence el</EtiquetaCabecera>
+          <input
+            type="date"
+            value={fechaVencimiento}
+            onChange={(e) => setFechaVencimiento(e.target.value)}
+            className={CLASE_CAMPO}
+          />
 
-            <div className="mb-3">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Bodega que recibe</label>
-              <select
-                value={bodegaId}
-                onChange={(e) => setBodegaId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-              >
-                <option value="">Bodega...</option>
-                {bodegas?.map((b) => (
-                  <option key={b.id} value={b.id}>{b.nombre}</option>
-                ))}
-              </select>
-            </div>
+          <EtiquetaCabecera>Sucursal</EtiquetaCabecera>
+          <div className={CLASE_SOLO_LECTURA}>{miSucursal?.nombre ?? "Sin sucursal asignada"}</div>
+          <EtiquetaCabecera>Bodega que recibe</EtiquetaCabecera>
+          <select
+            value={bodegaId}
+            onChange={(e) => setBodegaId(e.target.value ? Number(e.target.value) : "")}
+            className={CLASE_CAMPO}
+          >
+            <option value="">Selecciona...</option>
+            {bodegas?.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
+            ))}
+          </select>
+        </CabeceraDocumento>
 
-            <input
-              type="text"
-              placeholder="Número de factura del proveedor"
-              value={numeroFactura}
-              onChange={(e) => setNumeroFactura(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm mb-3"
-            />
+        <BuscadorProductosDocumento
+          busqueda={busquedaProducto}
+          onBusqueda={setBusquedaProducto}
+          productos={productosFiltrados}
+          onElegir={(p) => {
+            agregarAlCarrito(p);
+            setBusquedaProducto("");
+          }}
+          placeholder="Buscar por nombre, código, marca o modelo..."
+          infoDerecha={(p) => `Stock ${p.stockActual}`}
+        />
 
-            <div className="mb-3">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Fecha de vencimiento (opcional)</label>
-              <input
-                type="date"
-                value={fechaVencimiento}
-                onChange={(e) => setFechaVencimiento(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-              />
-            </div>
+        <DetalleDocumento>
+          <thead>
+            <tr className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700">
+              <th className={`${CLASE_TH} w-10`}>#</th>
+              <th className={`${CLASE_TH} w-32`}>Código</th>
+              <th className={CLASE_TH}>Descripción</th>
+              <th className={`${CLASE_TH} w-28`}>Lote</th>
+              <th className={`${CLASE_TH} w-36`}>Caducidad</th>
+              <th className={`${CLASE_TH} w-24 text-right`}>Cantidad</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>Costo unit.</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>Subtotal</th>
+              <th className={`${CLASE_TH} w-10`}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {carrito.length === 0 && (
+              <FilaDetalleVacia columnas={9}>Agrega productos con el buscador o el catálogo.</FilaDetalleVacia>
+            )}
+            {carrito.map((item, indice) => (
+              <tr key={item.producto.id} className="border-b border-stone-100 dark:border-gray-700/60 last:border-b-0">
+                <td className="px-3 py-1.5 font-mono text-xs text-gray-400">{indice + 1}</td>
+                <td className="px-3 py-1.5 font-mono text-xs text-gray-600 dark:text-gray-300">{item.producto.codigo}</td>
+                <td className="px-3 py-1.5 text-gray-800 dark:text-gray-100">
+                  <span className="uppercase text-[13px]">{item.producto.nombre}</span>
+                  {(item.producto.marca || item.producto.modelo) && (
+                    <span className="block text-xs text-gray-400 dark:text-gray-500">
+                      {[item.producto.marca, item.producto.modelo].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-1">
+                  {item.producto.manejaLotes ? (
+                    <input
+                      type="text"
+                      placeholder="Opcional"
+                      value={item.numeroLote}
+                      onChange={(e) => cambiarLote(item.producto.id, "numeroLote", e.target.value)}
+                      className={`${CLASE_CAMPO_CELDA} w-24 text-left`}
+                    />
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-1">
+                  {item.producto.manejaLotes ? (
+                    <input
+                      type="date"
+                      required
+                      value={item.fechaCaducidad}
+                      onChange={(e) => cambiarLote(item.producto.id, "fechaCaducidad", e.target.value)}
+                      className={`${CLASE_CAMPO_CELDA} w-32 text-left ${
+                        item.fechaCaducidad === "" ? "border-amber-400 dark:border-amber-600" : ""
+                      }`}
+                    />
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-1 text-right">
+                  <input
+                    type="number"
+                    min={1}
+                    value={item.cantidad}
+                    onChange={(e) => cambiarCantidad(item.producto.id, Number(e.target.value))}
+                    className={`${CLASE_CAMPO_CELDA} w-16`}
+                  />
+                </td>
+                <td className="px-3 py-1 text-right">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    placeholder="0.00"
+                    value={item.costoUnitario}
+                    onChange={(e) => cambiarCosto(item.producto.id, e.target.value)}
+                    className={`${CLASE_CAMPO_CELDA} w-24 ${
+                      item.costoUnitario === "" ? "border-amber-400 dark:border-amber-600" : ""
+                    }`}
+                  />
+                </td>
+                <td className="px-3 py-1.5 font-mono text-right tabular-nums font-medium text-gray-900 dark:text-gray-50">
+                  {((parseFloat(item.costoUnitario) || 0) * item.cantidad).toFixed(2)}
+                </td>
+                <td className="px-2 py-1.5 text-center">
+                  <button
+                    onClick={() => quitarDelCarrito(item.producto.id)}
+                    title="Quitar del detalle"
+                    className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </DetalleDocumento>
 
-            <div className="mb-3">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Sustento tributario (SRI)</label>
-              <input
-                type="text"
-                placeholder="Ej: 01, 06..."
-                required
-                value={sustentoTributario}
-                onChange={(e) => setSustentoTributario(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div className="border border-gray-200 dark:border-gray-700 rounded-md p-2 space-y-2 mb-3">
-              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-4 items-start">
+          <RecuadroDocumento titulo="Pago al proveedor">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <input
                   type="checkbox"
                   checked={usarCuotas}
                   onChange={(e) => setUsarCuotas(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
+                  className="rounded border-stone-300 dark:border-gray-600"
                 />
                 Pagar al proveedor en cuotas
               </label>
+              {!usarCuotas && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  Sin cuotas, el saldo queda pendiente y se registra desde "Registrar pago" en el historial.
+                </p>
+              )}
               {usarCuotas && (
                 <>
                   <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-500 dark:text-gray-400 shrink-0">N° de cuotas</label>
+                    <span className={CLASE_ETIQUETA}>N° de cuotas</span>
                     <select
                       value={numeroCuotas}
                       onChange={(e) => {
@@ -350,7 +477,7 @@ export function ComprasPage() {
                         setNumeroCuotas(n);
                         setFechasCuotas((actual) => Array.from({ length: n }, (_, i) => actual[i] ?? ""));
                       }}
-                      className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                      className={`${CLASE_CAMPO} w-auto`}
                     >
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
                         <option key={n} value={n}>
@@ -358,126 +485,57 @@ export function ComprasPage() {
                         </option>
                       ))}
                     </select>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">Total: ${totalCarrito.toFixed(2)}</span>
+                    <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
+                      Total a repartir: {totalCarrito.toFixed(2)}
+                    </span>
                   </div>
-                  {cuotasCalculadas.map((c, i) => (
-                    <div key={c.numero} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 w-16 shrink-0">Cuota {c.numero}</span>
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 w-16 shrink-0">
-                        ${c.monto.toFixed(2)}
-                      </span>
-                      <input
-                        type="date"
-                        required
-                        value={fechasCuotas[i] || ""}
-                        onChange={(e) => setFechasCuotas((actual) => actual.map((f, idx) => (idx === i ? e.target.value : f)))}
-                        className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
-                      />
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-
-            <div className="flex-1 space-y-3 mb-3">
-              {carrito.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">Sin productos agregados</p>}
-              {carrito.map((item) => (
-                <div key={item.producto.id} className="border-b border-gray-100 dark:border-gray-700 pb-2">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <p className="font-medium text-gray-800 dark:text-gray-100">{item.producto.nombre}</p>
-                    <button
-                      onClick={() => quitarDelCarrito(item.producto.id)}
-                      className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div>
-                      <label className="block text-[10px] text-gray-500 dark:text-gray-400">Cantidad</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.cantidad}
-                        onChange={(e) => cambiarCantidad(item.producto.id, Number(e.target.value))}
-                        className="w-16 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-1 py-1 text-center text-sm"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-[10px] text-gray-500 dark:text-gray-400">Costo unitario</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        placeholder="0.00"
-                        value={item.costoUnitario}
-                        onChange={(e) => cambiarCosto(item.producto.id, e.target.value)}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
-                      />
-                    </div>
-                  </div>
-                  {item.producto.manejaLotes && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-500 dark:text-gray-400">N° de lote (opcional)</label>
-                        <input
-                          type="text"
-                          value={item.numeroLote}
-                          onChange={(e) => cambiarLote(item.producto.id, "numeroLote", e.target.value)}
-                          className="w-28 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-[10px] text-gray-500 dark:text-gray-400">Fecha de caducidad</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5">
+                    {cuotasCalculadas.map((c, i) => (
+                      <div key={c.numero} className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-gray-500 dark:text-gray-400 w-16 shrink-0">Cuota {c.numero}</span>
+                        <span className="font-mono text-xs font-semibold text-gray-700 dark:text-gray-200 w-16 shrink-0 text-right">
+                          {c.monto.toFixed(2)}
+                        </span>
                         <input
                           type="date"
                           required
-                          value={item.fechaCaducidad}
-                          onChange={(e) => cambiarLote(item.producto.id, "fechaCaducidad", e.target.value)}
-                          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                          value={fechasCuotas[i] || ""}
+                          onChange={(e) =>
+                            setFechasCuotas((actual) => actual.map((f, idx) => (idx === i ? e.target.value : f)))
+                          }
+                          className={CLASE_CAMPO}
                         />
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-              <div className="flex justify-between font-semibold text-gray-800 dark:text-gray-100 mb-3">
-                <span>Total (aprox.)</span>
-                <span>${totalCarrito.toFixed(2)}</span>
-              </div>
-              <button
-                onClick={() => registrarCompra.mutate()}
-                disabled={
-                  !carritoValido ||
-                  !proveedorId ||
-                  !numeroFactura ||
-                  !bodegaId ||
-                  !sustentoTributario.trim() ||
-                  !cuotasValidas ||
-                  registrarCompra.isPending
-                }
-                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
-              >
-                {registrarCompra.isPending ? "Registrando..." : "Registrar compra"}
-              </button>
-              {registrarCompra.isError && (
-                <p className="text-red-600 dark:text-red-400 text-sm mt-2">
-                  {(registrarCompra.error as any)?.response?.data?.error ?? "Error al registrar la compra"}
-                </p>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
+          </RecuadroDocumento>
+
+          <div className="space-y-3">
+            <CuadroTotales etiquetaTotal="TOTAL (aprox.)" total={totalCarrito} />
+            <BotonConfirmar onClick={() => registrarCompra.mutate()} disabled={!puedeRegistrar}>
+              {registrarCompra.isPending ? "Registrando..." : "Registrar compra"}
+            </BotonConfirmar>
+            {registrarCompra.isError && (
+              <MensajeError>
+                {(registrarCompra.error as any)?.response?.data?.error ?? "Error al registrar la compra"}
+              </MensajeError>
+            )}
           </div>
         </div>
-      </div>
+      </MarcoDocumento>
 
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Historial de compras</h2>
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <SeccionListado titulo="Historial de compras">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · n° de factura, proveedor, RUC o sustento"
+          placeholder="Ej: 001-001-000000123, Distribuidora..."
+          opcionesEstado={[{ valor: "REGISTRADA", etiqueta: "Registrada" }, { valor: "ANULADA", etiqueta: "Anulada" }]}
+        />
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+            <thead className={CLASE_THEAD}>
               <tr>
                 <th className="px-4 py-2">Fact. proveedor</th>
                 <th className="px-4 py-2">Proveedor</th>
@@ -497,17 +555,17 @@ export function ComprasPage() {
               )}
               {!cargandoCompras && compras?.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">No hay compras registradas</td>
+                  <td colSpan={8} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">{filtros.hayFiltros ? "Ningún documento coincide con la búsqueda." : "No hay compras registradas"}</td>
                 </tr>
               )}
               {compras?.map((c) => {
                 const saldo = (parseFloat(c.total) - parseFloat(c.montoPagado)).toFixed(2);
                 return (
-                <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
-                  <td className="px-4 py-2 font-mono text-xs">{c.numeroFactura}</td>
-                  <td className="px-4 py-2">{c.proveedor.razonSocial}</td>
+                <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
+                  <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={c.numeroFactura} termino={filtros.busquedaAplicada} /></td>
+                  <td className="px-4 py-2"><Resaltar texto={c.proveedor.razonSocial} termino={filtros.busquedaAplicada} /></td>
                   <td className="px-4 py-2">{new Date(c.fechaEmision).toLocaleDateString("es-EC")}</td>
-                  <td className="px-4 py-2 text-right">${c.total}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums">{c.total}</td>
                   <td className="px-4 py-2">
                     <EstadoBadge estado={c.estado} />
                   </td>
@@ -538,7 +596,7 @@ export function ComprasPage() {
                           value={formSustento}
                           onChange={(e) => setFormSustento(e.target.value)}
                           placeholder="Ej: 01"
-                          className="w-16 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-1.5 py-1 text-xs"
+                          className="w-16 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-1.5 py-1 text-xs"
                         />
                         <button
                           type="submit"
@@ -571,13 +629,13 @@ export function ComprasPage() {
                   <td className="px-4 py-2 text-right space-x-3">
                     <button
                       onClick={() => abrirPdfEnNuevaPestana(`/compras/${c.id}/recibo`)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       Ver PDF
                     </button>
                     <button
                       onClick={() => setCompraVerPagosId(c.id)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       Ver pagos
                     </button>
@@ -600,7 +658,7 @@ export function ComprasPage() {
                     {c.estado !== "ANULADA" && !c.retencion && puedeRetenciones && empresaConfig?.agenteRetencion && (
                       <button
                         onClick={() => setCompraRetencionId(c.id)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                        className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                       >
                         Generar retención
                       </button>
@@ -609,7 +667,7 @@ export function ComprasPage() {
                       <>
                         <button
                           onClick={() => abrirPdfEnNuevaPestana(`/retenciones/${c.retencion!.id}/ride`)}
-                          className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                          className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                         >
                           Ver retención
                         </button>
@@ -626,7 +684,7 @@ export function ComprasPage() {
                           <button
                             onClick={() => consultarAutorizacionRetencion.mutate(c.retencion!.id)}
                             disabled={consultarAutorizacionRetencion.isPending}
-                            className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium disabled:opacity-40"
+                            className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium disabled:opacity-40"
                           >
                             Consultar autorización
                           </button>
@@ -639,6 +697,7 @@ export function ComprasPage() {
               })}
             </tbody>
           </table>
+          <PieResumenListado resumen={respuestaCompras?.resumen} hayFiltros={filtros.hayFiltros} />
           {respuestaCompras && (
             <Paginacion
               page={respuestaCompras.paginacion.page}
@@ -647,8 +706,7 @@ export function ComprasPage() {
               onCambiarPagina={setPagina}
             />
           )}
-        </div>
-      </div>
+      </SeccionListado>
 
       {compraPagoId !== null && (() => {
         const compra = compras?.find((c) => c.id === compraPagoId);

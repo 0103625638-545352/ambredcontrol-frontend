@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -12,6 +11,7 @@ import {
   type MoraPorBucket,
 } from "../api/client";
 import { BuscadorReportes } from "../components/BuscadorReportes";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
 
 interface ReporteVentas {
   rango: { desde: string; hasta: string };
@@ -220,7 +220,7 @@ function ResumenMora({ moraPorBucket }: { moraPorBucket: MoraPorBucket }) {
   return (
     <div className="flex flex-wrap gap-2 mb-4">
       {buckets.map((b) => (
-        <div key={b} className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-2">
+        <div key={b} className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 px-3 py-2">
           <p className="text-[11px] text-gray-500 dark:text-gray-400">{ETIQUETAS_BUCKET_MORA[b]}</p>
           <p className={`text-sm font-semibold ${colorAtraso(b === "1_30" ? 1 : b === "31_60" ? 31 : b === "61_90" ? 61 : 91)}`}>
             ${moraPorBucket[b]}
@@ -231,12 +231,50 @@ function ResumenMora({ moraPorBucket }: { moraPorBucket: MoraPorBucket }) {
   );
 }
 
+// Valores buscables de una fila cualquiera del reporte: sus textos y números
+// y los de sus objetos anidados de primer nivel (cliente, proveedor...). Así
+// el buscador sirve igual para todas las tablas sin listar campo por campo.
+function valoresBuscables(fila: unknown): (string | number)[] {
+  const valores: (string | number)[] = [];
+  const recorrer = (valor: unknown, profundidad: number) => {
+    if (typeof valor === "string" || typeof valor === "number") valores.push(valor);
+    else if (valor && typeof valor === "object" && profundidad < 2) {
+      for (const v of Object.values(valor as Record<string, unknown>)) recorrer(v, profundidad + 1);
+    }
+  };
+  recorrer(fila, 0);
+  return valores;
+}
+
+const SECCIONES_REPORTES: { id: string; titulo: string }[] = [
+  { id: "rep-facturas", titulo: "Facturas" },
+  { id: "rep-notas-venta", titulo: "Notas de venta" },
+  { id: "rep-compras", titulo: "Compras" },
+  { id: "rep-cobros-bancarios", titulo: "Cobros Bancarios" },
+  { id: "rep-cuentas-cobrar", titulo: "Cuentas por cobrar" },
+  { id: "rep-cuotas-cobrar", titulo: "Cuotas por cobrar" },
+  { id: "rep-cuentas-pagar", titulo: "Cuentas por pagar" },
+  { id: "rep-cuotas-pagar", titulo: "Cuotas por pagar" },
+  { id: "rep-rentabilidad", titulo: "Rentabilidad por producto" },
+  { id: "rep-iva", titulo: "IVA — Formulario 104" },
+];
+
 export function ReportesPage() {
   const hoy = new Date();
   const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
-  const [desde, setDesde] = useState(aInputDate(primerDiaMes));
-  const [hasta, setHasta] = useState(aInputDate(hoy));
+  // Buscador compartido de los listados: Desde/Hasta van al servidor (como
+  // antes, arrancando en "primer día del mes → hoy"); el texto filtra en el
+  // navegador TODAS las tablas del reporte a la vez (ej. un cliente: sus
+  // facturas, cuentas por cobrar y cuotas).
+  const filtros = useFiltrosListado(sinPaginacion, { desde: aInputDate(primerDiaMes), hasta: aInputDate(hoy) });
+  const { desde, hasta, setDesde, setHasta } = filtros;
+  function filtrar<T>(lista: T[]): T[] {
+    return filtrarLocal(lista, filtros, { textos: valoresBuscables }) ?? [];
+  }
+  function irASeccion(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // El buscador dinámico ("ventas de julio") reusa este mismo filtro de
   // fechas — no arma un reporte de ventas aparte, solo lo mueve al mes que
@@ -506,30 +544,40 @@ export function ReportesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Reportes</h2>
-        <div className="flex items-center gap-2 text-sm">
-          <label className="text-gray-600 dark:text-gray-300">Desde:</label>
-          <input
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1"
-          />
-          <label className="text-gray-600 dark:text-gray-300">Hasta:</label>
-          <input
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1"
-          />
-          <button
-            onClick={exportarExcel}
-            disabled={!reporte}
-            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40 ml-2"
-          >
-            Exportar a Excel
-          </button>
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-50">Reportes</h2>
+          <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+            {desde || "inicio"} → {hasta || "hoy"}
+          </span>
+        </div>
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar en todas las tablas · cliente, proveedor, número, producto..."
+          placeholder="Ej: Tornillo, 001-001-000000125, cable UTP..."
+          mostrarPago={false}
+          extras={
+            <button
+              type="button"
+              onClick={exportarExcel}
+              disabled={!reporte}
+              className="bg-brand-700 text-white px-3 py-1.5 rounded-sm text-xs font-semibold hover:bg-brand-800 disabled:opacity-40"
+            >
+              Exportar a Excel
+            </button>
+          }
+        />
+        <div className="flex flex-wrap gap-1.5 px-3 py-2">
+          {SECCIONES_REPORTES.map((sec) => (
+            <button
+              key={sec.id}
+              type="button"
+              onClick={() => irASeccion(sec.id)}
+              className="font-mono text-[10px] uppercase tracking-wider border border-stone-300 dark:border-gray-600 px-2 py-1 rounded-sm text-gray-600 dark:text-gray-300 hover:border-brand-600 hover:text-brand-700 dark:hover:text-brand-300"
+            >
+              {sec.titulo}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -539,25 +587,26 @@ export function ReportesPage() {
 
       {reporte && (
         <>
+          <h3 id="rep-facturas" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Facturas</h3>
           {/* Tarjetas de resumen */}
           <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Facturas emitidas</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{reporte.resumen.cantidadFacturas}</p>
+            <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Facturas emitidas</p>
+              <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{reporte.resumen.cantidadFacturas}</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Subtotal (sin IVA)</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+            <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Subtotal (sin IVA)</p>
+              <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">
                 ${(parseFloat(reporte.resumen.subtotal0) + parseFloat(reporte.resumen.subtotal12)).toFixed(2)}
               </p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">IVA cobrado</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">${reporte.resumen.iva}</p>
+            <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">IVA cobrado</p>
+              <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">${reporte.resumen.iva}</p>
             </div>
-            <div className="bg-emerald-600 rounded-lg shadow-sm p-4">
-              <p className="text-xs text-emerald-100 mb-1">Total del período</p>
-              <p className="text-2xl font-bold text-white">${reporte.resumen.total}</p>
+            <div className="bg-emerald-600 rounded-sm  p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-100 mb-1.5">Total del período</p>
+              <p className="font-mono text-2xl font-semibold tabular-nums text-white">${reporte.resumen.total}</p>
             </div>
           </div>
 
@@ -565,8 +614,8 @@ export function ReportesPage() {
               venta combinadas), por eso no lleva leyenda — el título ya dice
               qué se grafica. Los días sin ventas quedan en $0, no se ocultan. */}
           {ventasPorDia && (
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-6">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Tendencia de ventas por día</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4 mb-6">
+              <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-1">Tendencia de ventas por día</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Incluye facturas y notas de venta</p>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={ventasPorDia} barCategoryGap={2} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
@@ -587,7 +636,7 @@ export function ReportesPage() {
                     width={56}
                   />
                   <Tooltip content={<TooltipVentasPorDia />} cursor={{ fill: "var(--chart-grid)" }} />
-                  <Bar dataKey="total" fill="var(--chart-series-1)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                  <Bar dataKey="total" fill="var(--chart-series-1)" radius={[1, 1, 0, 0]} maxBarSize={24} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -595,12 +644,12 @@ export function ReportesPage() {
 
           <div className="grid grid-cols-3 gap-4">
             {/* Tabla de facturas del período */}
-            <div className="col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Facturas del período</h3>
+            <div className="col-span-2 bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+              <div className="px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+                <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Facturas del período</h3>
               </div>
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                   <tr>
                     <th className="px-4 py-2">No.</th>
                     <th className="px-4 py-2">Cliente</th>
@@ -616,12 +665,12 @@ export function ReportesPage() {
                       </td>
                     </tr>
                   )}
-                  {reporte.facturas.map((f) => (
-                    <tr key={f.id} className="border-t border-gray-100 dark:border-gray-700">
+                  {filtrar(reporte.facturas).map((f) => (
+                    <tr key={f.id} className="border-t border-stone-100 dark:border-gray-700">
                       <td className="px-4 py-2 font-mono text-xs">{f.secuencial}</td>
                       <td className="px-4 py-2">{f.cliente}</td>
                       <td className="px-4 py-2">{new Date(f.fechaEmision).toLocaleDateString("es-EC")}</td>
-                      <td className="px-4 py-2 text-right">${f.total}</td>
+                      <td className="px-4 py-2 text-right font-mono tabular-nums">${f.total}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -629,16 +678,16 @@ export function ReportesPage() {
             </div>
 
             {/* Ranking de productos más vendidos */}
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Más vendidos</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+              <div className="px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+                <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Más vendidos</h3>
                 <p className="text-xs text-gray-400 dark:text-gray-500">Incluye facturas y notas de venta</p>
               </div>
               <ul className="divide-y divide-gray-100 dark:divide-gray-700">
                 {ranking?.length === 0 && (
                   <li className="px-4 py-4 text-center text-gray-400 dark:text-gray-500 text-sm">Sin datos</li>
                 )}
-                {ranking?.slice(0, 8).map((p) => (
+                {filtrar(ranking ?? []).slice(0, 8).map((p) => (
                   <li key={p.productoId} className="px-4 py-2 flex justify-between text-sm">
                     <span className="text-gray-700 dark:text-gray-300">{p.nombre}</span>
                     <span className="font-semibold text-gray-800 dark:text-gray-100">{p.cantidad}</span>
@@ -651,35 +700,35 @@ export function ReportesPage() {
           {/* --- Notas de venta: sección propia, igual que Facturas arriba --- */}
           {reporteNotasVenta && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Notas de venta</h3>
+              <h3 id="rep-notas-venta" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Notas de venta</h3>
 
               <div className="grid grid-cols-4 gap-4 mb-4">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Notas de venta emitidas</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{reporteNotasVenta.resumen.cantidadNotasVenta}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Notas de venta emitidas</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{reporteNotasVenta.resumen.cantidadNotasVenta}</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Subtotal</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Subtotal</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">
                     ${(parseFloat(reporteNotasVenta.resumen.subtotal0) + parseFloat(reporteNotasVenta.resumen.subtotal12)).toFixed(2)}
                   </p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">IVA cobrado</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">${reporteNotasVenta.resumen.iva}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">IVA cobrado</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">${reporteNotasVenta.resumen.iva}</p>
                 </div>
-                <div className="bg-slate-800 rounded-lg shadow-sm p-4">
-                  <p className="text-xs text-slate-300 mb-1">Total del período</p>
-                  <p className="text-2xl font-bold text-white">${reporteNotasVenta.resumen.total}</p>
+                <div className="bg-brand-700 rounded-sm  p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-brand-100 mb-1.5">Total del período</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">${reporteNotasVenta.resumen.total}</p>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Notas de venta del período</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+                  <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Notas de venta del período</h3>
                 </div>
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">No.</th>
                       <th className="px-4 py-2">Cliente</th>
@@ -696,13 +745,13 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {reporteNotasVenta.notasVenta.map((n) => (
-                      <tr key={n.id} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(reporteNotasVenta.notasVenta).map((n) => (
+                      <tr key={n.id} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2 font-mono text-xs">{n.secuencial}</td>
                         <td className="px-4 py-2">{n.cliente}</td>
                         <td className="px-4 py-2">{new Date(n.fechaEmision).toLocaleDateString("es-EC")}</td>
                         <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{n.aplicaIva ? "Sí" : "No"}</td>
-                        <td className="px-4 py-2 text-right">${n.total}</td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums">${n.total}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -714,35 +763,35 @@ export function ReportesPage() {
           {/* --- Compras: el "reverso" de las ventas, sección propia --- */}
           {reporteCompras && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Compras</h3>
+              <h3 id="rep-compras" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Compras</h3>
 
               <div className="grid grid-cols-4 gap-4 mb-4">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Compras registradas</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{reporteCompras.resumen.cantidadCompras}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Compras registradas</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{reporteCompras.resumen.cantidadCompras}</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Subtotal</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Subtotal</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">
                     ${(parseFloat(reporteCompras.resumen.subtotal0) + parseFloat(reporteCompras.resumen.subtotal12)).toFixed(2)}
                   </p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">IVA pagado</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">${reporteCompras.resumen.iva}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">IVA pagado</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">${reporteCompras.resumen.iva}</p>
                 </div>
-                <div className="bg-amber-600 rounded-lg shadow-sm p-4">
+                <div className="bg-amber-600 rounded-sm  p-4">
                   <p className="text-xs text-amber-100 mb-1">Total del período</p>
-                  <p className="text-2xl font-bold text-white">${reporteCompras.resumen.total}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">${reporteCompras.resumen.total}</p>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Compras del período</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+                  <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Compras del período</h3>
                 </div>
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">Fact. proveedor</th>
                       <th className="px-4 py-2">Proveedor</th>
@@ -758,12 +807,12 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {reporteCompras.compras.map((c) => (
-                      <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(reporteCompras.compras).map((c) => (
+                      <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2 font-mono text-xs">{c.numeroFactura}</td>
                         <td className="px-4 py-2">{c.proveedor}</td>
                         <td className="px-4 py-2">{new Date(c.fechaEmision).toLocaleDateString("es-EC")}</td>
-                        <td className="px-4 py-2 text-right">${c.total}</td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums">${c.total}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -778,36 +827,36 @@ export function ReportesPage() {
               está en Reporteador Principal > Cobros Bancarios. --- */}
           {reporteCobrosBancarios && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Cobros Bancarios</h3>
+              <h3 id="rep-cobros-bancarios" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-1">Cobros Bancarios</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
                 Incluye cobros a clientes y pagos a proveedores por transferencia, tarjeta o cheque
               </p>
 
               <div className="grid grid-cols-4 gap-4 mb-4">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Movimientos</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{reporteCobrosBancarios.resumen.cantidadMovimientos}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Movimientos</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{reporteCobrosBancarios.resumen.cantidadMovimientos}</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total cobrado</p>
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${reporteCobrosBancarios.resumen.totalCobrado}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Total cobrado</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">${reporteCobrosBancarios.resumen.totalCobrado}</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total pagado a proveedores</p>
-                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">${reporteCobrosBancarios.resumen.totalPagado}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Total pagado a proveedores</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-red-600 dark:text-red-400">${reporteCobrosBancarios.resumen.totalPagado}</p>
                 </div>
-                <div className={`rounded-lg shadow-sm p-4 ${parseFloat(reporteCobrosBancarios.resumen.neto) >= 0 ? "bg-emerald-600" : "bg-red-600"}`}>
+                <div className={`rounded-sm  p-4 ${parseFloat(reporteCobrosBancarios.resumen.neto) >= 0 ? "bg-emerald-600" : "bg-red-600"}`}>
                   <p className="text-xs text-white/80 mb-1">Neto del período</p>
-                  <p className="text-2xl font-bold text-white">${reporteCobrosBancarios.resumen.neto}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">${reporteCobrosBancarios.resumen.neto}</p>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Por cuenta bancaria</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+                  <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Por cuenta bancaria</h3>
                 </div>
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">Cuenta</th>
                       <th className="px-4 py-2">Banco</th>
@@ -825,8 +874,8 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {reporteCobrosBancarios.porCuenta.map((c) => (
-                      <tr key={c.cuentaBancariaId} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(reporteCobrosBancarios.porCuenta).map((c) => (
+                      <tr key={c.cuentaBancariaId} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">{c.nombre}</td>
                         <td className="px-4 py-2">
                           {c.banco} — {c.numeroCuenta}
@@ -846,22 +895,22 @@ export function ReportesPage() {
           {/* --- Cuentas por cobrar/pagar: NO dependen del rango de fechas de arriba --- */}
           {cuentasPorCobrar && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Cuentas por cobrar</h3>
+              <h3 id="rep-cuentas-cobrar" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Cuentas por cobrar</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Incluye facturas y notas de venta pendientes de cobro</p>
               <div className="grid grid-cols-2 gap-4 mb-4 max-w-lg">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Documentos pendientes</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{cuentasPorCobrar.resumen.cantidadDocumentos}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Documentos pendientes</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{cuentasPorCobrar.resumen.cantidadDocumentos}</p>
                 </div>
-                <div className="bg-amber-600 rounded-lg shadow-sm p-4">
+                <div className="bg-amber-600 rounded-sm  p-4">
                   <p className="text-xs text-amber-100 mb-1">Total por cobrar</p>
-                  <p className="text-2xl font-bold text-white">${cuentasPorCobrar.resumen.totalPorCobrar}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">${cuentasPorCobrar.resumen.totalPorCobrar}</p>
                 </div>
               </div>
               <ResumenMora moraPorBucket={cuentasPorCobrar.resumen.moraPorBucket} />
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">Tipo</th>
                       <th className="px-4 py-2">No.</th>
@@ -882,8 +931,8 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {cuentasPorCobrar.documentos.map((d) => (
-                      <tr key={`${d.tipo}-${d.id}`} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(cuentasPorCobrar.documentos).map((d) => (
+                      <tr key={`${d.tipo}-${d.id}`} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
                           {d.tipo === "FACTURA" ? "Factura" : "Nota de venta"}
                         </td>
@@ -895,7 +944,7 @@ export function ReportesPage() {
                         </td>
                         <td className={`px-4 py-2 text-xs font-medium ${colorAtraso(d.diasAtraso)}`}>{textoAtraso(d.diasAtraso)}</td>
                         <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{d.estadoPago}</td>
-                        <td className="px-4 py-2 text-right">${d.total}</td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums">${d.total}</td>
                         <td className="px-4 py-2 text-right font-semibold">${d.saldo}</td>
                       </tr>
                     ))}
@@ -909,27 +958,27 @@ export function ReportesPage() {
               de un plan a plazos (ver modelo Cuota), no por documento --- */}
           {cuotasPorCobrar && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Cuotas por cobrar</h3>
+              <h3 id="rep-cuotas-cobrar" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Cuotas por cobrar</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
                 Ventas vendidas a plazos — cada cuota se cobra en orden, ordenadas por la más próxima a vencer
               </p>
               <div className="grid grid-cols-3 gap-4 mb-4 max-w-2xl">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Cuotas pendientes</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{cuotasPorCobrar.resumen.cantidadCuotas}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Cuotas pendientes</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{cuotasPorCobrar.resumen.cantidadCuotas}</p>
                 </div>
-                <div className="bg-red-600 rounded-lg shadow-sm p-4">
+                <div className="bg-red-600 rounded-sm  p-4">
                   <p className="text-xs text-red-100 mb-1">Vencidas</p>
-                  <p className="text-2xl font-bold text-white">{cuotasPorCobrar.resumen.vencidas}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">{cuotasPorCobrar.resumen.vencidas}</p>
                 </div>
-                <div className="bg-amber-600 rounded-lg shadow-sm p-4">
+                <div className="bg-amber-600 rounded-sm  p-4">
                   <p className="text-xs text-amber-100 mb-1">Total en cuotas</p>
-                  <p className="text-2xl font-bold text-white">${cuotasPorCobrar.resumen.totalPorCobrar}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">${cuotasPorCobrar.resumen.totalPorCobrar}</p>
                 </div>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">Tipo</th>
                       <th className="px-4 py-2">No.</th>
@@ -948,8 +997,8 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {cuotasPorCobrar.cuotas.map((c) => (
-                      <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(cuotasPorCobrar.cuotas).map((c) => (
+                      <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
                           {c.tipo === "FACTURA" ? "Factura" : "Nota de venta"}
                         </td>
@@ -973,21 +1022,21 @@ export function ReportesPage() {
 
           {cuentasPorPagar && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Cuentas por pagar</h3>
+              <h3 id="rep-cuentas-pagar" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Cuentas por pagar</h3>
               <div className="grid grid-cols-2 gap-4 mb-4 max-w-lg">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Compras pendientes</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{cuentasPorPagar.resumen.cantidadCompras}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Compras pendientes</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{cuentasPorPagar.resumen.cantidadCompras}</p>
                 </div>
-                <div className="bg-red-600 rounded-lg shadow-sm p-4">
+                <div className="bg-red-600 rounded-sm  p-4">
                   <p className="text-xs text-red-100 mb-1">Total por pagar</p>
-                  <p className="text-2xl font-bold text-white">${cuentasPorPagar.resumen.totalPorPagar}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">${cuentasPorPagar.resumen.totalPorPagar}</p>
                 </div>
               </div>
               <ResumenMora moraPorBucket={cuentasPorPagar.resumen.moraPorBucket} />
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">Fact. proveedor</th>
                       <th className="px-4 py-2">Proveedor</th>
@@ -1007,8 +1056,8 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {cuentasPorPagar.compras.map((c) => (
-                      <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(cuentasPorPagar.compras).map((c) => (
+                      <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2 font-mono text-xs">{c.numeroFactura}</td>
                         <td className="px-4 py-2">{c.proveedor}</td>
                         <td className="px-4 py-2">{new Date(c.fechaEmision).toLocaleDateString("es-EC")}</td>
@@ -1017,7 +1066,7 @@ export function ReportesPage() {
                         </td>
                         <td className={`px-4 py-2 text-xs font-medium ${colorAtraso(c.diasAtraso)}`}>{textoAtraso(c.diasAtraso)}</td>
                         <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{c.estadoPago}</td>
-                        <td className="px-4 py-2 text-right">${c.total}</td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums">${c.total}</td>
                         <td className="px-4 py-2 text-right font-semibold">${c.saldo}</td>
                       </tr>
                     ))}
@@ -1031,27 +1080,27 @@ export function ReportesPage() {
               de un plan a plazos con un proveedor (ver modelo Cuota) --- */}
           {cuotasPorPagar && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Cuotas por pagar</h3>
+              <h3 id="rep-cuotas-pagar" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Cuotas por pagar</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
                 Compras pactadas a plazos con un proveedor — cada cuota se paga en orden, ordenadas por la más próxima a vencer
               </p>
               <div className="grid grid-cols-3 gap-4 mb-4 max-w-2xl">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Cuotas pendientes</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{cuotasPorPagar.resumen.cantidadCuotas}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Cuotas pendientes</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">{cuotasPorPagar.resumen.cantidadCuotas}</p>
                 </div>
-                <div className="bg-red-600 rounded-lg shadow-sm p-4">
+                <div className="bg-red-600 rounded-sm  p-4">
                   <p className="text-xs text-red-100 mb-1">Vencidas</p>
-                  <p className="text-2xl font-bold text-white">{cuotasPorPagar.resumen.vencidas}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">{cuotasPorPagar.resumen.vencidas}</p>
                 </div>
-                <div className="bg-amber-600 rounded-lg shadow-sm p-4">
+                <div className="bg-amber-600 rounded-sm  p-4">
                   <p className="text-xs text-amber-100 mb-1">Total en cuotas</p>
-                  <p className="text-2xl font-bold text-white">${cuotasPorPagar.resumen.totalPorPagar}</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">${cuotasPorPagar.resumen.totalPorPagar}</p>
                 </div>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">No.</th>
                       <th className="px-4 py-2">Proveedor</th>
@@ -1069,8 +1118,8 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {cuotasPorPagar.cuotas.map((c) => (
-                      <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(cuotasPorPagar.cuotas).map((c) => (
+                      <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2 font-mono text-xs">{c.numeroFactura}</td>
                         <td className="px-4 py-2">{c.proveedor}</td>
                         <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">Cuota {c.numero}</td>
@@ -1092,14 +1141,14 @@ export function ReportesPage() {
           {/* --- Rentabilidad: margen por producto contra el costo promedio de compra --- */}
           {rentabilidad && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3">Rentabilidad por producto</h3>
+              <h3 id="rep-rentabilidad" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-3">Rentabilidad por producto</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
                 Ingreso de lo vendido en el período contra el costo promedio ponderado de compra. Los productos sin
                 historial en Compras aparecen como "sin datos de costo" (no se asume $0, inflaría el margen).
               </p>
-              <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                  <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                     <tr>
                       <th className="px-4 py-2">Producto</th>
                       <th className="px-4 py-2 text-right">Cant. vendida</th>
@@ -1117,11 +1166,11 @@ export function ReportesPage() {
                         </td>
                       </tr>
                     )}
-                    {rentabilidad.ranking.map((p) => (
-                      <tr key={p.productoId} className="border-t border-gray-100 dark:border-gray-700">
+                    {filtrar(rentabilidad.ranking).map((p) => (
+                      <tr key={p.productoId} className="border-t border-stone-100 dark:border-gray-700">
                         <td className="px-4 py-2">{p.nombre}</td>
                         <td className="px-4 py-2 text-right">{p.cantidadVendida}</td>
-                        <td className="px-4 py-2 text-right">${p.ingresoTotal}</td>
+                        <td className="px-4 py-2 text-right font-mono tabular-nums">${p.ingresoTotal}</td>
                         <td className="px-4 py-2 text-right text-gray-500 dark:text-gray-400">
                           {p.costoPromedio ? `$${p.costoPromedio}` : "Sin datos"}
                         </td>
@@ -1150,7 +1199,7 @@ export function ReportesPage() {
           {/* --- IVA — Formulario 104: resumen mensual para la declaración al SRI --- */}
           {reporteIva && (
             <div className="mt-8">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">IVA — Formulario 104</h3>
+              <h3 id="rep-iva" className="scroll-mt-4 border-b-2 border-gray-900 dark:border-gray-200 pb-1.5 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-gray-900 dark:text-gray-50 mb-1">IVA — Formulario 104</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
                 Ventas gravadas (Facturas + Notas de venta con IVA, menos Notas de crédito) y compras con derecho a
                 crédito tributario, para el período elegido arriba. El IVA que un cliente te haya retenido a vos
@@ -1159,16 +1208,16 @@ export function ReportesPage() {
               </p>
 
               <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ventas gravadas</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Ventas gravadas</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">
                     ${(parseFloat(reporteIva.ventas.gravadas0) + parseFloat(reporteIva.ventas.gravadas12)).toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">IVA cobrado: ${reporteIva.ventas.ivaCobrado}</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Compras gravadas</p>
-                  <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Compras gravadas</p>
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-gray-800 dark:text-gray-100">
                     ${(parseFloat(reporteIva.compras.gravadas0) + parseFloat(reporteIva.compras.gravadas12)).toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -1176,19 +1225,19 @@ export function ReportesPage() {
                   </p>
                 </div>
                 <div
-                  className={`rounded-lg shadow-sm p-4 ${reporteIva.resumen.esAFavor ? "bg-sky-600" : "bg-emerald-600"}`}
+                  className={`rounded-sm  p-4 ${reporteIva.resumen.esAFavor ? "bg-sky-600" : "bg-emerald-600"}`}
                 >
                   <p className={`text-xs mb-1 ${reporteIva.resumen.esAFavor ? "text-sky-100" : "text-emerald-100"}`}>
                     {reporteIva.resumen.esAFavor ? "Crédito tributario a favor" : "IVA a pagar"}
                   </p>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="font-mono text-2xl font-semibold tabular-nums text-white">
                     ${Math.abs(parseFloat(reporteIva.resumen.ivaCausado)).toFixed(2)}
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     Retenciones que le hiciste a tus proveedores (informativo — obligación aparte de remitir al SRI)
                   </p>
@@ -1204,7 +1253,7 @@ export function ReportesPage() {
                     {reporteIva.retencionesPracticadas.cantidad} retención(es) en el período
                   </p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Retenciones que te hicieron tus clientes (reduce el IVA a pagar)</p>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-300">IVA retenido</span>

@@ -252,7 +252,7 @@ export function ReporteadorPrincipalPage({ esAdmin, puedeNotasCredito, puedeAudi
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Reporteador Principal</h2>
+      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-1">Reporteador Principal</h2>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
         Reportes filtrables por fecha, con detalle por fila y exportación a Excel.
       </p>
@@ -262,10 +262,10 @@ export function ReporteadorPrincipalPage({ esAdmin, puedeNotasCredito, puedeAudi
           <button
             key={p.id}
             onClick={() => setPestanaActiva(p.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
               pestanaActiva === p.id
-                ? "bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-700"
-                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
+                ? "bg-brand-700 dark:bg-brand-700 text-white border-brand-700 dark:border-brand-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-stone-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
             }`}
           >
             {p.etiqueta}

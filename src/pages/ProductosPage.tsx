@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Camera } from "lucide-react";
 import { api, abrirPdfEnNuevaPestana, type Producto, type Categoria, type TipoPrecio, type Bodega, type RespuestaPaginada } from "../api/client";
@@ -10,7 +10,8 @@ import { ModalLotesProducto } from "../components/ModalLotesProducto";
 import { EscanerCodigoBarras } from "../components/EscanerCodigoBarras";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
-import { useDebounce } from "../hooks/useDebounce";
+import { useFiltrosListado, BarraBuscadorDocumentos } from "../components/BuscadorDocumentos";
+import { EncabezadoListado, CLASE_BOTON_ENCABEZADO, CLASE_CAMPO, CLASE_ETIQUETA, Resaltar } from "../components/FormatoDocumento";
 
 const TAMANO_PAGINA = 20;
 
@@ -33,15 +34,12 @@ export function ProductosPage() {
   const confirmar = useConfirm();
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [pagina, setPagina] = useState(1);
-  const [busqueda, setBusqueda] = useState("");
-  const busquedaDebounced = useDebounce(busqueda);
+  // Buscador compartido de los listados (en el servidor: la lista pagina).
+  const filtros = useFiltrosListado(setPagina);
 
   // Si el usuario cambia lo que busca, siempre volvemos a la página 1 —
   // si nos quedáramos en, digamos, la página 3, podría no haber resultados
   // ahí aunque sí existan en la página 1 de la nueva búsqueda.
-  useEffect(() => {
-    setPagina(1);
-  }, [busquedaDebounced]);
 
   // Controla qué producto tiene abierto su mini-formulario de "entrada de stock"
   const [productoEntradaId, setProductoEntradaId] = useState<number | null>(null);
@@ -92,11 +90,11 @@ export function ProductosPage() {
   // "placeholderData: keepPreviousData" evita el parpadeo de "Cargando..."
   // al cambiar de página: mientras llega la nueva, se ve la anterior.
   const { data: respuesta, isLoading } = useQuery({
-    queryKey: ["productos", pagina, busquedaDebounced],
+    queryKey: ["productos", pagina, ...filtros.clave],
     queryFn: async () =>
       (
         await api.get<RespuestaPaginada<Producto>>("/productos", {
-          params: { page: pagina, pageSize: TAMANO_PAGINA, q: busquedaDebounced || undefined },
+          params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params },
         })
       ).data,
     placeholderData: keepPreviousData,
@@ -278,194 +276,217 @@ export function ProductosPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Productos</h2>
-        {puedeProductos && (
-          <button
-            onClick={() => setMostrarFormulario(!mostrarFormulario)}
-            className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <EncabezadoListado
+          titulo="Productos"
+          conteo={respuesta?.paginacion.total}
+          singular="producto"
+          plural="productos"
+          acciones={
+            puedeProductos && (
+              <button onClick={() => setMostrarFormulario(!mostrarFormulario)} className={CLASE_BOTON_ENCABEZADO}>
+                {mostrarFormulario ? "Cancelar" : "+ Nuevo producto"}
+              </button>
+            )
+          }
+        />
+        {puedeProductos && mostrarFormulario && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              crearProducto.mutate();
+            }}
+            className="p-4 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700 grid grid-cols-2 gap-3"
           >
-            {mostrarFormulario ? "Cancelar" : "+ Nuevo producto"}
-          </button>
-        )}
-      </div>
-
-      <input
-        type="text"
-        placeholder="Buscar por nombre, código o modelo..."
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full mb-4"
-      />
-
-      {puedeProductos && mostrarFormulario && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            crearProducto.mutate();
-          }}
-          className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 grid grid-cols-2 gap-3"
-        >
-          <div className="flex gap-1">
-            <input
-              placeholder="Código de barras (opcional)"
-              value={form.codigoBarras}
-              onChange={(e) => setForm({ ...form, codigoBarras: e.target.value })}
-              className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => setEscaneando("crear")}
-              title="Escanear con la cámara"
-              className="shrink-0 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md px-2.5 hover:bg-gray-50 dark:hover:bg-gray-600"
-            >
-              <IconoCamara />
-            </button>
-          </div>
-          <input
-            placeholder="Marca (opcional, ej. Mikrotik, TP-Link)"
-            value={form.marca}
-            onChange={(e) => setForm({ ...form, marca: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Modelo (opcional, ej. RB750Gr3)"
-            value={form.modelo}
-            onChange={(e) => setForm({ ...form, modelo: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Nombre"
-            required
-            value={form.nombre}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <div className="flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md px-3 py-2">
-            <input
-              type="checkbox"
-              id="crear-aplica-iva"
-              checked={form.ivaPorcentaje !== "0"}
-              onChange={(e) => setForm({ ...form, ivaPorcentaje: e.target.checked ? "15" : "0" })}
-            />
-            <label htmlFor="crear-aplica-iva" className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              Aplica IVA
-            </label>
-            {form.ivaPorcentaje !== "0" && (
+            <div className="flex gap-1">
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                value={form.ivaPorcentaje}
-                onChange={(e) => setForm({ ...form, ivaPorcentaje: e.target.value })}
-                className="w-16 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                placeholder="Código de barras (opcional)"
+                value={form.codigoBarras}
+                onChange={(e) => setForm({ ...form, codigoBarras: e.target.value })}
+                className="flex-1 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               />
-            )}
-          </div>
-          {!form.manejaLotes && (
-            <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Stock inicial (opcional)</label>
-              <input
-                placeholder="Cantidad de unidades con las que arranca este producto"
-                type="number"
-                min="0"
-                value={form.stockActual}
-                onChange={(e) => setForm({ ...form, stockActual: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-              />
+              <button
+                type="button"
+                onClick={() => setEscaneando("crear")}
+                title="Escanear con la cámara"
+                className="shrink-0 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-sm px-2.5 hover:bg-stone-50 dark:hover:bg-gray-600"
+              >
+                <IconoCamara />
+              </button>
             </div>
-          )}
-          {!form.manejaLotes && parseInt(form.stockActual, 10) > 0 && (
-            <select
+            <input
+              placeholder="Marca (opcional, ej. Mikrotik, TP-Link)"
+              value={form.marca}
+              onChange={(e) => setForm({ ...form, marca: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Modelo (opcional, ej. RB750Gr3)"
+              value={form.modelo}
+              onChange={(e) => setForm({ ...form, modelo: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Nombre"
               required
-              value={form.bodegaId}
-              onChange={(e) => setForm({ ...form, bodegaId: e.target.value })}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              value={form.nombre}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <div className="flex items-center gap-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-sm px-3 py-2">
+              <input
+                type="checkbox"
+                id="crear-aplica-iva"
+                checked={form.ivaPorcentaje !== "0"}
+                onChange={(e) => setForm({ ...form, ivaPorcentaje: e.target.checked ? "15" : "0" })}
+              />
+              <label htmlFor="crear-aplica-iva" className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                Aplica IVA
+              </label>
+              {form.ivaPorcentaje !== "0" && (
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={form.ivaPorcentaje}
+                  onChange={(e) => setForm({ ...form, ivaPorcentaje: e.target.value })}
+                  className="w-16 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
+                />
+              )}
+            </div>
+            {!form.manejaLotes && (
+              <div>
+                <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Stock inicial (opcional)</label>
+                <input
+                  placeholder="Cantidad de unidades con las que arranca este producto"
+                  type="number"
+                  min="0"
+                  value={form.stockActual}
+                  onChange={(e) => setForm({ ...form, stockActual: e.target.value })}
+                  className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                />
+              </div>
+            )}
+            {!form.manejaLotes && parseInt(form.stockActual, 10) > 0 && (
+              <select
+                required
+                value={form.bodegaId}
+                onChange={(e) => setForm({ ...form, bodegaId: e.target.value })}
+                className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+              >
+                <option value="">Bodega del stock inicial...</option>
+                {bodegas?.map((b) => (
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                ))}
+              </select>
+            )}
+            <select
+              value={form.categoriaId}
+              onChange={(e) => setForm({ ...form, categoriaId: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             >
-              <option value="">Bodega del stock inicial...</option>
-              {bodegas?.map((b) => (
-                <option key={b.id} value={b.id}>{b.nombre}</option>
+              <option value="">Sin categoría</option>
+              {categorias?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
               ))}
             </select>
-          )}
-          <select
-            value={form.categoriaId}
-            onChange={(e) => setForm({ ...form, categoriaId: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          >
-            <option value="">Sin categoría</option>
-            {categorias?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-          <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              checked={form.manejaLotes}
-              onChange={(e) => setForm({ ...form, manejaLotes: e.target.checked, stockActual: "0" })}
-            />
-            Es perecible: manejar por lotes (cada entrada de stock tendrá su propia caducidad)
-          </label>
-          {form.manejaLotes ? (
-            <p className="col-span-2 text-xs text-gray-500 dark:text-gray-400 -mt-2">
-              El stock se ingresa después con "+ Stock", asignando un lote y su caducidad.
-            </p>
-          ) : (
-            <div className="col-span-2">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Fecha de caducidad (opcional)</label>
+            <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
-                type="date"
-                value={form.fechaCaducidad}
-                onChange={(e) => setForm({ ...form, fechaCaducidad: e.target.value })}
-                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                type="checkbox"
+                checked={form.manejaLotes}
+                onChange={(e) => setForm({ ...form, manejaLotes: e.target.checked, stockActual: "0" })}
+              />
+              Es perecible: manejar por lotes (cada entrada de stock tendrá su propia caducidad)
+            </label>
+            {form.manejaLotes ? (
+              <p className="col-span-2 text-xs text-gray-500 dark:text-gray-400 -mt-2">
+                El stock se ingresa después con "+ Stock", asignando un lote y su caducidad.
+              </p>
+            ) : (
+              <div className="col-span-2">
+                <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Fecha de caducidad (opcional)</label>
+                <input
+                  type="date"
+                  value={form.fechaCaducidad}
+                  onChange={(e) => setForm({ ...form, fechaCaducidad: e.target.value })}
+                  className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+                />
+              </div>
+            )}
+            <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={form.controlaNumeroSerie}
+                onChange={(e) => setForm({ ...form, controlaNumeroSerie: e.target.checked })}
+              />
+              Controla número de serie (bodega capturará un serial por cada unidad que entre por Compras)
+            </label>
+            <textarea
+              placeholder="Detalle del producto (opcional)"
+              value={form.descripcion}
+              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+              rows={2}
+              className="col-span-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm resize-none"
+            />
+            <div className="col-span-2">
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Imagen (opcional)</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => setImagenSeleccionada(e.target.files?.[0] ?? null)}
+                className="text-sm text-gray-700 dark:text-gray-300 w-full"
               />
             </div>
-          )}
-          <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              checked={form.controlaNumeroSerie}
-              onChange={(e) => setForm({ ...form, controlaNumeroSerie: e.target.checked })}
-            />
-            Controla número de serie (bodega capturará un serial por cada unidad que entre por Compras)
-          </label>
-          <textarea
-            placeholder="Detalle del producto (opcional)"
-            value={form.descripcion}
-            onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-            rows={2}
-            className="col-span-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm resize-none"
-          />
-          <div className="col-span-2">
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Imagen (opcional)</label>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setImagenSeleccionada(e.target.files?.[0] ?? null)}
-              className="text-sm text-gray-700 dark:text-gray-300 w-full"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={crearProducto.isPending || (!form.manejaLotes && parseInt(form.stockActual, 10) > 0 && !form.bodegaId)}
-            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-          >
-            {crearProducto.isPending ? "Guardando..." : "Guardar producto"}
-          </button>
-          {crearProducto.isError && (
-            <p className="col-span-2 text-red-600 dark:text-red-400 text-sm">
-              Error al guardar. ¿El código ya existe?
-            </p>
-          )}
-        </form>
-      )}
-
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <button
+              type="submit"
+              disabled={crearProducto.isPending || (!form.manejaLotes && parseInt(form.stockActual, 10) > 0 && !form.bodegaId)}
+              className="col-span-2 bg-brand-700 text-white py-2 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
+            >
+              {crearProducto.isPending ? "Guardando..." : "Guardar producto"}
+            </button>
+            {crearProducto.isError && (
+              <p className="col-span-2 text-red-600 dark:text-red-400 text-sm">
+                Error al guardar. ¿El código ya existe?
+              </p>
+            )}
+          </form>
+        )}
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · nombre, código, código de barras, marca o modelo"
+          placeholder="Ej: Router, PROD-00012, TP-Link..."
+          mostrarPago={false}
+          extras={
+            <>
+              <label className="flex flex-col gap-1 w-44">
+                <span className={CLASE_ETIQUETA}>Categoría</span>
+                <select value={filtros.extra.categoriaId ?? ""} onChange={(e) => filtros.setExtra("categoriaId", e.target.value)} className={CLASE_CAMPO}>
+                  <option value="">Todas</option>
+                  <option value="sin">Sin categoría</option>
+                  {categorias?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 w-32">
+                <span className={CLASE_ETIQUETA}>Tipo</span>
+                <select value={filtros.extra.tipo ?? ""} onChange={(e) => filtros.setExtra("tipo", e.target.value)} className={CLASE_CAMPO}>
+                  <option value="">Todos</option>
+                  <option value="BIEN">Bienes</option>
+                  <option value="SERVICIO">Servicios</option>
+                </select>
+              </label>
+            </>
+          }
+        />
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2"></th>
               <th className="px-4 py-2">Código</th>
@@ -487,19 +508,19 @@ export function ProductosPage() {
             {!isLoading && productos?.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  {busquedaDebounced ? `Sin resultados para "${busquedaDebounced}"` : "No hay productos"}
+                  {filtros.hayFiltros ? "Ningún producto coincide con la búsqueda." : "No hay productos"}
                 </td>
               </tr>
             )}
             {productos?.map((p) => (
               <Fragment key={p.id}>
-                <tr className="border-t border-gray-100 dark:border-gray-700">
+                <tr className="border-t border-stone-100 dark:border-gray-700">
                   <td className="px-4 py-2">
                     <ImagenProducto producto={p} tamano={40} />
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs">{p.codigo}</td>
+                  <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={p.codigo} termino={filtros.busquedaAplicada} /></td>
                   <td className="px-4 py-2">
-                    {p.nombre}
+                    <Resaltar texto={p.nombre} termino={filtros.busquedaAplicada} />
                     {(p.marca || p.modelo) && (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {[p.marca, p.modelo].filter(Boolean).join(" · ")}
@@ -544,14 +565,14 @@ export function ProductosPage() {
                   <td className="px-4 py-2 text-right space-x-3">
                     <button
                       onClick={() => setProductoHistorialId(p.id)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       Historial
                     </button>
                     {p.manejaLotes && (
                       <button
                         onClick={() => setProductoLotesId(p.id)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                        className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                       >
                         Lotes
                       </button>
@@ -562,7 +583,7 @@ export function ProductosPage() {
                         setProductoEditandoId(null);
                         setProductoEtiquetaId(productoEtiquetaId === p.id ? null : p.id);
                       }}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       {productoEtiquetaId === p.id ? "Cancelar" : "Etiquetas"}
                     </button>
@@ -570,7 +591,7 @@ export function ProductosPage() {
                       <>
                         <button
                           onClick={() => abrirEdicion(p)}
-                          className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                          className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                         >
                           {productoEditandoId === p.id ? "Cancelar" : "Editar"}
                         </button>
@@ -604,7 +625,7 @@ export function ProductosPage() {
                 </tr>
 
                 {productoEditandoId === p.id && (
-                  <tr className="bg-slate-50 dark:bg-gray-700/40">
+                  <tr className="bg-stone-50 dark:bg-gray-700/40">
                     <td colSpan={7} className="px-4 py-3">
                       <form
                         onSubmit={(e) => {
@@ -614,58 +635,58 @@ export function ProductosPage() {
                         className="flex flex-wrap items-end gap-2"
                       >
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Nombre</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Nombre</label>
                           <input
                             type="text"
                             required
                             autoFocus
                             value={editForm.nombre}
                             onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-56"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-56"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Código de barras</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Código de barras</label>
                           <div className="flex gap-1">
                             <input
                               type="text"
                               placeholder="Opcional"
                               value={editForm.codigoBarras}
                               onChange={(e) => setEditForm({ ...editForm, codigoBarras: e.target.value })}
-                              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-40"
+                              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-40"
                             />
                             <button
                               type="button"
                               onClick={() => setEscaneando("editar")}
                               title="Escanear con la cámara"
-                              className="shrink-0 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md px-2 hover:bg-gray-50 dark:hover:bg-gray-600"
+                              className="shrink-0 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md px-2 hover:bg-stone-50 dark:hover:bg-gray-600"
                             >
                               <IconoCamara />
                             </button>
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Marca</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Marca</label>
                           <input
                             type="text"
                             placeholder="Opcional"
                             value={editForm.marca}
                             onChange={(e) => setEditForm({ ...editForm, marca: e.target.value })}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-40"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-40"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Modelo</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Modelo</label>
                           <input
                             type="text"
                             placeholder="Opcional"
                             value={editForm.modelo}
                             onChange={(e) => setEditForm({ ...editForm, modelo: e.target.value })}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-40"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-40"
                           />
                         </div>
                         <div className="col-span-2">
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
                             Precios de venta (calculados, no editables)
                           </label>
                           {!p.costoPromedioActual ? (
@@ -684,7 +705,7 @@ export function ProductosPage() {
                           )}
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">IVA</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">IVA</label>
                           <div className="flex items-center gap-1.5">
                             <input
                               type="checkbox"
@@ -700,27 +721,27 @@ export function ProductosPage() {
                                 max="100"
                                 value={editForm.ivaPorcentaje}
                                 onChange={(e) => setEditForm({ ...editForm, ivaPorcentaje: e.target.value })}
-                                className="w-16 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                                className="w-16 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
                               />
                             )}
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Stock mínimo</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Stock mínimo</label>
                           <input
                             type="number"
                             required
                             value={editForm.stockMinimo}
                             onChange={(e) => setEditForm({ ...editForm, stockMinimo: e.target.value })}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-24"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-24"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Categoría</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Categoría</label>
                           <select
                             value={editForm.categoriaId}
                             onChange={(e) => setEditForm({ ...editForm, categoriaId: e.target.value })}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
                           >
                             <option value="">Sin categoría</option>
                             {categorias?.map((c) => (
@@ -741,12 +762,12 @@ export function ProductosPage() {
                           </label>
                           {!editForm.manejaLotes && (
                             <div>
-                              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Fecha de caducidad</label>
+                              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Fecha de caducidad</label>
                               <input
                                 type="date"
                                 value={editForm.fechaCaducidad}
                                 onChange={(e) => setEditForm({ ...editForm, fechaCaducidad: e.target.value })}
-                                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                                className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
                               />
                             </div>
                           )}
@@ -760,16 +781,16 @@ export function ProductosPage() {
                           </label>
                         </div>
                         <div className="w-full">
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Detalle del producto</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Detalle del producto</label>
                           <textarea
                             value={editForm.descripcion}
                             onChange={(e) => setEditForm({ ...editForm, descripcion: e.target.value })}
                             rows={2}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-full resize-none"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-full resize-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Cambiar imagen</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Cambiar imagen</label>
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
@@ -781,14 +802,14 @@ export function ProductosPage() {
                           <button
                             type="submit"
                             disabled={editarProducto.isPending}
-                            className="bg-slate-800 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+                            className="bg-brand-700 text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
                           >
                             {editarProducto.isPending ? "Guardando..." : "Guardar cambios"}
                           </button>
                           <button
                             type="button"
                             onClick={() => setProductoEditandoId(null)}
-                            className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-4 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
+                            className="bg-stone-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-4 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
                           >
                             Cancelar
                           </button>
@@ -812,7 +833,7 @@ export function ProductosPage() {
                         className="flex flex-wrap items-end gap-2"
                       >
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Cantidad recibida</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Cantidad recibida</label>
                           <input
                             type="number"
                             min={1}
@@ -820,39 +841,39 @@ export function ProductosPage() {
                             autoFocus
                             value={entradaForm.cantidad}
                             onChange={(e) => setEntradaForm({ ...entradaForm, cantidad: e.target.value })}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-28"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-28"
                           />
                         </div>
                         {p.manejaLotes ? (
                           <>
                             <div>
-                              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de lote (opcional)</label>
+                              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">N° de lote (opcional)</label>
                               <input
                                 type="text"
                                 value={entradaForm.numeroLote}
                                 onChange={(e) => setEntradaForm({ ...entradaForm, numeroLote: e.target.value })}
-                                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-32"
+                                className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-32"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Fecha de caducidad</label>
+                              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Fecha de caducidad</label>
                               <input
                                 type="date"
                                 required
                                 value={entradaForm.fechaCaducidad}
                                 onChange={(e) => setEntradaForm({ ...entradaForm, fechaCaducidad: e.target.value })}
-                                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                                className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
                               />
                             </div>
                           </>
                         ) : (
                           <div>
-                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Bodega</label>
+                            <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Bodega</label>
                             <select
                               required
                               value={entradaForm.bodegaId}
                               onChange={(e) => setEntradaForm({ ...entradaForm, bodegaId: e.target.value })}
-                              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
                             >
                               <option value="">Elige una bodega...</option>
                               {bodegas?.map((b) => (
@@ -862,19 +883,19 @@ export function ProductosPage() {
                           </div>
                         )}
                         <div className="flex-1">
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Motivo (opcional)</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Motivo (opcional)</label>
                           <input
                             type="text"
                             placeholder="Ej: Compra a Distribuidora XYZ"
                             value={entradaForm.motivo}
                             onChange={(e) => setEntradaForm({ ...entradaForm, motivo: e.target.value })}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-full"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-full"
                           />
                         </div>
                         <button
                           type="submit"
                           disabled={registrarEntrada.isPending || (!p.manejaLotes && !entradaForm.bodegaId)}
-                          className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+                          className="bg-brand-700 text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
                         >
                           {registrarEntrada.isPending ? "Guardando..." : "Confirmar entrada"}
                         </button>
@@ -887,7 +908,7 @@ export function ProductosPage() {
                 )}
 
                 {productoEtiquetaId === p.id && (
-                  <tr className="bg-slate-50 dark:bg-gray-700/40">
+                  <tr className="bg-stone-50 dark:bg-gray-700/40">
                     <td colSpan={7} className="px-4 py-3">
                       <form
                         onSubmit={(e) => {
@@ -897,7 +918,7 @@ export function ProductosPage() {
                         className="flex items-end gap-2"
                       >
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Cantidad de etiquetas</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Cantidad de etiquetas</label>
                           <input
                             type="number"
                             min={1}
@@ -906,15 +927,15 @@ export function ProductosPage() {
                             autoFocus
                             value={cantidadEtiquetas}
                             onChange={(e) => setCantidadEtiquetas(e.target.value)}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm w-32"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm w-32"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Tamaño de etiqueta</label>
+                          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Tamaño de etiqueta</label>
                           <select
                             value={tamanoEtiqueta}
                             onChange={(e) => setTamanoEtiqueta(e.target.value)}
-                            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
                           >
                             {TAMANOS_ETIQUETA.map((t) => (
                               <option key={t.valor} value={t.valor}>
@@ -928,7 +949,7 @@ export function ProductosPage() {
                         </p>
                         <button
                           type="submit"
-                          className="bg-slate-800 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-slate-700"
+                          className="bg-brand-700 text-white px-4 py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800"
                         >
                           Generar PDF
                         </button>
@@ -940,6 +961,7 @@ export function ProductosPage() {
             ))}
           </tbody>
         </table>
+        </div>
         {respuesta && (
           <Paginacion
             page={respuesta.paginacion.page}

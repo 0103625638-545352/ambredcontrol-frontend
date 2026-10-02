@@ -99,7 +99,7 @@ export function FormularioMarcacion({ empresaId }: Props) {
         </p>
         <button
           onClick={() => setConfirmacion(null)}
-          className="mt-5 w-full bg-slate-800 dark:bg-slate-700 text-white py-2.5 rounded-md text-sm font-medium hover:bg-slate-900 dark:hover:bg-slate-600"
+          className="mt-5 w-full bg-brand-700 dark:bg-brand-700 text-white py-2.5 rounded-md text-sm font-semibold hover:bg-brand-800 dark:hover:bg-brand-800"
         >
           Marcar otra vez
         </button>
@@ -110,24 +110,24 @@ export function FormularioMarcacion({ empresaId }: Props) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Cédula</label>
+        <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Cédula</label>
         <input
           type="text"
           inputMode="numeric"
           value={cedula}
           onChange={(e) => setCedula(e.target.value)}
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2.5 text-base"
+          className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5.5 text-base"
           placeholder="1710034065"
         />
       </div>
       <div>
-        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">PIN</label>
+        <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">PIN</label>
         <input
           type="password"
           inputMode="numeric"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2.5 text-base tracking-widest"
+          className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5.5 text-base tracking-widest"
           placeholder="••••"
         />
       </div>
@@ -138,7 +138,7 @@ export function FormularioMarcacion({ empresaId }: Props) {
         <button
           disabled={!formularioValido || marcar.isPending}
           onClick={() => marcar.mutate("ENTRADA")}
-          className="bg-brand-600 text-white py-3 rounded-md text-sm font-semibold hover:bg-brand-700 disabled:opacity-40"
+          className="bg-brand-700 text-white py-3 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-40"
         >
           {marcar.isPending && marcar.variables === "ENTRADA" ? "..." : "Entrada"}
         </button>

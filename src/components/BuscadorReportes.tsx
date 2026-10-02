@@ -178,8 +178,8 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
   });
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-6">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Buscador dinámico</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4 mb-6">
+      <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-1">Buscador dinámico</h3>
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
         Escribe o dicta una consulta, ej. "{EJEMPLOS_BUSQUEDA[0]}". Reconoce un vocabulario fijo de frases — no está
         conectado a ninguna inteligencia artificial.
@@ -191,7 +191,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
           onChange={(e) => setTexto(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && buscar()}
           placeholder={EJEMPLOS_BUSQUEDA[0]}
-          className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="flex-1 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
         {puedeDictar && (
           <button
@@ -201,7 +201,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
             className={`px-3 py-2 rounded-md text-sm font-medium ${
               escuchando
                 ? "bg-red-600 text-white animate-pulse"
-                : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                : "bg-stone-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-stone-200 dark:hover:bg-gray-600"
             }`}
           >
             🎤
@@ -210,7 +210,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
         <button
           type="button"
           onClick={buscar}
-          className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
+          className="bg-brand-700 text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-brand-800"
         >
           Buscar
         </button>
@@ -240,7 +240,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
           {data && data.clientes.length > 0 && (
             <div className="overflow-hidden rounded-md border border-gray-100 dark:border-gray-700">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                   <tr>
                     <th className="px-3 py-2">Identificación</th>
                     <th className="px-3 py-2">Razón Social</th>
@@ -250,7 +250,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
                 </thead>
                 <tbody>
                   {data.clientes.map((c) => (
-                    <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                    <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
                       <td className="px-3 py-2 font-mono text-xs">{c.identificacion}</td>
                       <td className="px-3 py-2">{c.razonSocial}</td>
                       <td className="px-3 py-2">{c.telefono ?? "—"}</td>
@@ -283,7 +283,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
           {dataEstado && dataEstado.clientes.length > 0 && (
             <div className="overflow-hidden rounded-md border border-gray-100 dark:border-gray-700">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+                <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                   <tr>
                     <th className="px-3 py-2">Identificación</th>
                     <th className="px-3 py-2">Razón Social</th>
@@ -294,7 +294,7 @@ export function BuscadorReportes({ onVentasPorMes }: { onVentasPorMes: (anio: nu
                 </thead>
                 <tbody>
                   {dataEstado.clientes.map((c) => (
-                    <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                    <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
                       <td className="px-3 py-2 font-mono text-xs">{c.identificacion}</td>
                       <td className="px-3 py-2">{c.razonSocial}</td>
                       <td className="px-3 py-2">{c.telefono ?? "—"}</td>

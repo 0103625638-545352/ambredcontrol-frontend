@@ -16,6 +16,8 @@ import { ModalCrearAsientoManual } from "../components/ModalCrearAsientoManual";
 import { usePermiso } from "../context/AuthContext";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import { CLASE_CAMPO, CLASE_ETIQUETA, CLASE_THEAD, Resaltar } from "../components/FormatoDocumento";
 
 type Pestana = "planCuentas" | "libroDiario" | "libroMayor" | "balanceComprobacion" | "balanceGeneral" | "estadoResultados";
 
@@ -59,10 +61,15 @@ export function ContabilidadPage() {
   ];
 
   return (
-    <div>
-      <div className="flex justify-between items-start mb-4">
+    <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+        <h2 className="text-base font-bold text-gray-900 dark:text-gray-50">Contabilidad</h2>
+        <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+          {pestanas.find((p) => p.id === pestanaActiva)?.etiqueta}
+        </span>
+      </div>
+      <div className="px-4 py-2 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-200 dark:border-gray-700">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Contabilidad</h2>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Plan de cuentas y libro diario de partida doble. Ventas, compras, pagos y movimientos de caja generan su
             asiento automáticamente; usa "Nuevo asiento manual" para todo lo demás (arriendo, sueldos, ajustes).
@@ -72,21 +79,23 @@ export function ContabilidadPage() {
 
       {puedeEditar && <PanelCierreContable />}
 
-      <div className="flex flex-wrap gap-1.5 mb-4">
+      <div className="flex flex-wrap border-b border-stone-300 dark:border-gray-700 px-2">
         {pestanas.map((p) => (
           <button
             key={p.id}
             onClick={() => setPestanaActiva(p.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+            className={`px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px ${
               pestanaActiva === p.id
-                ? "bg-slate-800 dark:bg-slate-700 text-white border-slate-800 dark:border-slate-700"
-                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
+                ? "border-brand-600 text-brand-700 dark:text-brand-300"
+                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
             }`}
           >
             {p.etiqueta}
           </button>
         ))}
       </div>
+
+      <div className="p-4">
 
       {pestanaActiva === "planCuentas" && (
         <PestanaPlanCuentas puedeEditar={puedeEditar} onNuevaCuenta={() => setMostrarModalCuenta(true)} />
@@ -98,7 +107,7 @@ export function ContabilidadPage() {
             <div className="flex justify-end mb-2">
               <button
                 onClick={() => setMostrarModalAsiento(true)}
-                className="bg-sky-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-sky-700"
+                className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-3 py-1.5 rounded-sm text-sm font-semibold hover:bg-stone-50 dark:hover:bg-gray-700"
               >
                 + Nuevo asiento manual
               </button>
@@ -123,6 +132,7 @@ export function ContabilidadPage() {
       {pestanaActiva === "balanceGeneral" && <PestanaBalanceGeneral />}
 
       {pestanaActiva === "estadoResultados" && <PestanaEstadoResultados />}
+      </div>
 
       {mostrarModalCuenta && <ModalCrearCuenta onCerrar={() => setMostrarModalCuenta(false)} />}
       {mostrarModalAsiento && <ModalCrearAsientoManual onCerrar={() => setMostrarModalAsiento(false)} />}
@@ -131,25 +141,32 @@ export function ContabilidadPage() {
         <Modal titulo={`Asiento ${asientoDetalle.numero}`} onCerrar={() => setAsientoDetalle(null)}>
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{asientoDetalle.descripcion}</p>
           <table className="w-full text-sm">
-            <thead className="text-left text-gray-500 dark:text-gray-400">
+            <thead className={CLASE_THEAD}>
               <tr>
-                <th className="py-1 pr-2">Cuenta</th>
-                <th className="py-1 pr-2 text-right">Debe</th>
-                <th className="py-1 text-right">Haber</th>
+                <th className="px-2 py-1.5">Cuenta</th>
+                <th className="px-2 py-1.5 text-right">Debe</th>
+                <th className="px-2 py-1.5 text-right">Haber</th>
               </tr>
             </thead>
             <tbody>
               {asientoDetalle.lineas.map((l) => (
-                <tr key={l.id} className="border-t border-gray-100 dark:border-gray-700">
-                  <td className="py-1 pr-2">
-                    {l.cuenta.codigo} - {l.cuenta.nombre}
+                <tr key={l.id} className="border-t border-stone-100 dark:border-gray-700">
+                  <td className="px-2 py-1.5">
+                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{l.cuenta.codigo}</span> {l.cuenta.nombre}
                     {l.glosa && <span className="block text-xs text-gray-400 dark:text-gray-500">{l.glosa}</span>}
                   </td>
-                  <td className="py-1 pr-2 text-right">{parseFloat(l.debe) > 0 ? `$${parseFloat(l.debe).toFixed(2)}` : "—"}</td>
-                  <td className="py-1 text-right">{parseFloat(l.haber) > 0 ? `$${parseFloat(l.haber).toFixed(2)}` : "—"}</td>
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums">{parseFloat(l.debe) > 0 ? parseFloat(l.debe).toFixed(2) : "—"}</td>
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums">{parseFloat(l.haber) > 0 ? parseFloat(l.haber).toFixed(2) : "—"}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-gray-900 dark:border-gray-200 font-bold text-gray-900 dark:text-gray-50">
+                <td className="px-2 py-2">TOTAL USD</td>
+                <td className="px-2 py-2 text-right font-mono tabular-nums">{sumar(asientoDetalle.lineas, "debe").toFixed(2)}</td>
+                <td className="px-2 py-2 text-right font-mono tabular-nums">{sumar(asientoDetalle.lineas, "haber").toFixed(2)}</td>
+              </tr>
+            </tfoot>
           </table>
           {asientoDetalle.asientoRevertidoId && (
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">Este asiento es la reversión de otro.</p>
@@ -197,9 +214,9 @@ function PanelCierreContable() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3 mb-4 flex flex-wrap items-end gap-3">
+    <div className="px-4 py-2.5 border-b border-stone-300 dark:border-gray-700 flex flex-wrap items-end gap-3">
       <div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Cierre contable</p>
+        <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Cierre contable</p>
         <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
           {data?.cierreContableHasta ? `Cerrado hasta ${data.cierreContableHasta}` : "Sin cerrar"}
         </p>
@@ -208,12 +225,12 @@ function PanelCierreContable() {
         type="date"
         value={fecha}
         onChange={(e) => setFecha(e.target.value)}
-        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
       />
       <button
         onClick={confirmarActualizar}
         disabled={!fecha || actualizarCierre.isPending}
-        className="bg-amber-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-amber-700 disabled:opacity-40"
+        className="bg-amber-600 text-white px-3 py-1.5 rounded-sm text-xs font-medium hover:bg-amber-700 disabled:opacity-40"
       >
         Actualizar cierre
       </button>
@@ -262,21 +279,54 @@ function PestanaPlanCuentas({ puedeEditar, onNuevaCuenta }: { puedeEditar: boole
     if (ok) editarCuenta.mutate({ id: c.id, activa: false });
   }
 
+  // Buscador compartido de los listados (en el navegador: el plan de
+  // cuentas ya viene completo), con filtro por tipo de cuenta.
+  const filtros = useFiltrosListado(sinPaginacion);
+  const cuentasFiltradas = filtrarLocal(cuentas, filtros, {
+    textos: (c) => [c.codigo, c.nombre],
+    estado: (c) => (c.activa ? "ACTIVA" : "INACTIVA"),
+    extra: (c, extra) => !extra.tipo || c.tipo === extra.tipo,
+  });
+
   return (
     <div>
       {puedeEditar && (
         <div className="flex justify-end mb-2">
           <button
             onClick={onNuevaCuenta}
-            className="bg-sky-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-sky-700"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-3 py-1.5 rounded-sm text-sm font-semibold hover:bg-stone-50 dark:hover:bg-gray-700"
           >
             + Nueva cuenta
           </button>
         </div>
       )}
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-x-auto">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · código o nombre de la cuenta"
+          placeholder="Ej: 1.1.01, Caja, Ventas..."
+          opcionesEstado={[
+            { valor: "ACTIVA", etiqueta: "Activa" },
+            { valor: "INACTIVA", etiqueta: "Inactiva" },
+          ]}
+          mostrarPago={false}
+          mostrarFechas={false}
+          extras={
+            <label className="flex flex-col gap-1 w-36">
+              <span className={CLASE_ETIQUETA}>Tipo</span>
+              <select value={filtros.extra.tipo ?? ""} onChange={(e) => filtros.setExtra("tipo", e.target.value)} className={CLASE_CAMPO}>
+                <option value="">Todos</option>
+                {["ACTIVO", "PASIVO", "PATRIMONIO", "INGRESO", "COSTO", "GASTO"].map((t) => (
+                  <option key={t} value={t}>
+                    {t.charAt(0) + t.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+        />
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Código</th>
               <th className="px-4 py-2">Nombre</th>
@@ -292,9 +342,9 @@ function PestanaPlanCuentas({ puedeEditar, onNuevaCuenta }: { puedeEditar: boole
                 <td colSpan={puedeEditar ? 6 : 5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
               </tr>
             )}
-            {(cuentas ?? []).map((c) =>
+            {(cuentasFiltradas ?? []).map((c) =>
               cuentaEditandoId === c.id ? (
-                <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
+                <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
                   <td colSpan={puedeEditar ? 6 : 5} className="px-4 py-2">
                     <form
                       onSubmit={(e) => {
@@ -309,7 +359,7 @@ function PestanaPlanCuentas({ puedeEditar, onNuevaCuenta }: { puedeEditar: boole
                         required
                         value={nombreEdicion}
                         onChange={(e) => setNombreEdicion(e.target.value)}
-                        className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
+                        className="flex-1 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
                       />
                       <span className="text-xs text-gray-400 dark:text-gray-500">
                         {c.tipo} · {c.naturaleza === "DEUDORA" ? "Deudora" : "Acreedora"}
@@ -317,14 +367,14 @@ function PestanaPlanCuentas({ puedeEditar, onNuevaCuenta }: { puedeEditar: boole
                       <button
                         type="submit"
                         disabled={editarCuenta.isPending}
-                        className="bg-slate-800 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-slate-700 disabled:opacity-50"
+                        className="bg-brand-700 text-white px-3 py-1 rounded-sm text-xs font-semibold hover:bg-brand-800 disabled:opacity-50"
                       >
                         Guardar
                       </button>
                       <button
                         type="button"
                         onClick={() => setCuentaEditandoId(null)}
-                        className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
+                        className="bg-stone-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-3 py-1 rounded-sm text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
                       >
                         Cancelar
                       </button>
@@ -332,11 +382,11 @@ function PestanaPlanCuentas({ puedeEditar, onNuevaCuenta }: { puedeEditar: boole
                   </td>
                 </tr>
               ) : (
-                <tr key={c.id} className="border-t border-gray-100 dark:border-gray-700">
-                  <td className="px-4 py-2 font-mono text-xs">{c.codigo}</td>
-                  <td className="px-4 py-2">{c.nombre}</td>
-                  <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{c.tipo}</td>
-                  <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{c.naturaleza === "DEUDORA" ? "Deudora" : "Acreedora"}</td>
+                <tr key={c.id} className="border-t border-stone-100 dark:border-gray-700">
+                  <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={c.codigo} termino={filtros.busquedaAplicada} /></td>
+                  <td className="px-4 py-2"><Resaltar texto={c.nombre} termino={filtros.busquedaAplicada} /></td>
+                  <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{c.tipo}</td>
+                  <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">{c.naturaleza === "DEUDORA" ? "Deudora" : "Acreedora"}</td>
                   <td className="px-4 py-2">
                     {c.activa ? (
                       <span className="text-emerald-600 dark:text-emerald-400 text-xs">Activa</span>
@@ -348,7 +398,7 @@ function PestanaPlanCuentas({ puedeEditar, onNuevaCuenta }: { puedeEditar: boole
                     <td className="px-4 py-2 text-right space-x-3">
                       <button
                         onClick={() => abrirEdicion(c)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                        className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                       >
                         Editar
                       </button>
@@ -396,11 +446,11 @@ function PestanaLibroMayor() {
     <div>
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Cuenta</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Cuenta</label>
           <select
             value={cuentaId}
             onChange={(e) => setCuentaId(e.target.value ? Number(e.target.value) : "")}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           >
             <option value="">Selecciona una cuenta...</option>
             {(cuentas ?? []).map((c) => (
@@ -411,21 +461,21 @@ function PestanaLibroMayor() {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Desde</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Desde</label>
           <input
             type="date"
             value={desde}
             onChange={(e) => setDesde(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Hasta</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Hasta</label>
           <input
             type="date"
             value={hasta}
             onChange={(e) => setHasta(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
         </div>
       </div>
@@ -433,9 +483,9 @@ function PestanaLibroMayor() {
       {cuentaId === "" && <p className="text-sm text-gray-400 dark:text-gray-500">Selecciona una cuenta para ver su libro mayor.</p>}
 
       {cuentaId !== "" && (
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+            <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
               <tr>
                 <th className="px-4 py-2">Fecha</th>
                 <th className="px-4 py-2">Asiento</th>
@@ -452,13 +502,13 @@ function PestanaLibroMayor() {
                 </tr>
               )}
               {libroMayor && (
-                <tr className="border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+                <tr className="border-t border-stone-100 dark:border-gray-700 bg-stone-50 dark:bg-gray-900/30">
                   <td colSpan={5} className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">Saldo inicial</td>
                   <td className="px-4 py-2 text-right font-medium">${libroMayor.saldoInicial}</td>
                 </tr>
               )}
               {libroMayor?.movimientos.map((m) => (
-                <tr key={m.id} className="border-t border-gray-100 dark:border-gray-700">
+                <tr key={m.id} className="border-t border-stone-100 dark:border-gray-700">
                   <td className="px-4 py-2">{new Date(m.asiento.fecha).toLocaleDateString("es-EC")}</td>
                   <td className="px-4 py-2 font-mono text-xs">{m.asiento.numero}</td>
                   <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{m.glosa || m.asiento.descripcion}</td>
@@ -496,19 +546,19 @@ function PestanaBalanceComprobacion() {
     <div>
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Hasta</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Hasta</label>
           <input
             type="date"
             value={hasta}
             onChange={(e) => setHasta(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Cuenta</th>
               <th className="px-4 py-2 text-right">Total Debe</th>
@@ -525,23 +575,23 @@ function PestanaBalanceComprobacion() {
             {(filas ?? [])
               .filter((f) => parseFloat(f.totalDebe) > 0 || parseFloat(f.totalHaber) > 0)
               .map((f) => (
-                <tr key={f.cuenta.id} className="border-t border-gray-100 dark:border-gray-700">
+                <tr key={f.cuenta.id} className="border-t border-stone-100 dark:border-gray-700">
                   <td className="px-4 py-2">
                     <span className="font-mono text-xs text-gray-500 dark:text-gray-400 mr-2">{f.cuenta.codigo}</span>
                     {f.cuenta.nombre}
                   </td>
-                  <td className="px-4 py-2 text-right">${f.totalDebe}</td>
-                  <td className="px-4 py-2 text-right">${f.totalHaber}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums">${f.totalDebe}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums">${f.totalHaber}</td>
                   <td className="px-4 py-2 text-right font-medium">${f.saldo}</td>
                 </tr>
               ))}
           </tbody>
           {filas && (
             <tfoot>
-              <tr className="border-t-2 border-gray-200 dark:border-gray-600 font-semibold">
+              <tr className="border-t-2 border-stone-300 dark:border-gray-600 font-semibold">
                 <td className="px-4 py-2">Total</td>
-                <td className="px-4 py-2 text-right">${totalDebe.toFixed(2)}</td>
-                <td className="px-4 py-2 text-right">${totalHaber.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right font-mono tabular-nums">${totalDebe.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right font-mono tabular-nums">${totalHaber.toFixed(2)}</td>
                 <td className="px-4 py-2 text-right">{Math.abs(totalDebe - totalHaber) < 0.005 ? "Cuadrado" : "Descuadrado"}</td>
               </tr>
             </tfoot>
@@ -555,9 +605,9 @@ function PestanaBalanceComprobacion() {
 function TablaSeccion({ titulo, filas }: { titulo: string; filas: { cuenta: CuentaContable; saldo: string }[] }) {
   const total = filas.reduce((acc, f) => acc + parseFloat(f.saldo), 0);
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{titulo}</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+      <div className="px-4 py-2 border-b border-stone-100 dark:border-gray-700">
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">{titulo}</h3>
       </div>
       <table className="w-full text-sm">
         <tbody>
@@ -567,19 +617,19 @@ function TablaSeccion({ titulo, filas }: { titulo: string; filas: { cuenta: Cuen
             </tr>
           )}
           {filas.map((f) => (
-            <tr key={f.cuenta.id} className="border-t border-gray-100 dark:border-gray-700">
+            <tr key={f.cuenta.id} className="border-t border-stone-100 dark:border-gray-700">
               <td className="px-4 py-2">
                 <span className="font-mono text-xs text-gray-500 dark:text-gray-400 mr-2">{f.cuenta.codigo}</span>
                 {f.cuenta.nombre}
               </td>
-              <td className="px-4 py-2 text-right">${f.saldo}</td>
+              <td className="px-4 py-2 text-right font-mono tabular-nums">${f.saldo}</td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="border-t-2 border-gray-200 dark:border-gray-600 font-semibold">
+          <tr className="border-t-2 border-stone-300 dark:border-gray-600 font-semibold">
             <td className="px-4 py-2">Total {titulo}</td>
-            <td className="px-4 py-2 text-right">${total.toFixed(2)}</td>
+            <td className="px-4 py-2 text-right font-mono tabular-nums">${total.toFixed(2)}</td>
           </tr>
         </tfoot>
       </table>
@@ -603,12 +653,12 @@ function PestanaBalanceGeneral() {
     <div>
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Hasta</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Hasta</label>
           <input
             type="date"
             value={hasta}
             onChange={(e) => setHasta(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
         </div>
       </div>
@@ -624,13 +674,13 @@ function PestanaBalanceGeneral() {
             filas={[...data.patrimonio, { cuenta: { id: -1, codigo: "", nombre: "Utilidad del ejercicio", tipo: "PATRIMONIO", naturaleza: "ACREEDORA", cuentaPadreId: null, permiteMovimiento: false, activa: true, createdAt: "" }, saldo: data.utilidadEjercicio }]}
           />
 
-          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center">
+          <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4 flex justify-between items-center">
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Activo: ${data.totales.activo}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Pasivo + Patrimonio: ${data.totales.pasivoMasPatrimonio}</p>
             </div>
             <span
-              className={`px-3 py-1 rounded-full text-xs font-medium ${
+              className={`px-3 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider font-semibold ${
                 data.totales.cuadrado
                   ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
                   : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
@@ -664,21 +714,21 @@ function PestanaEstadoResultados() {
     <div>
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Desde</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Desde</label>
           <input
             type="date"
             value={desde}
             onChange={(e) => setDesde(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Hasta</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Hasta</label>
           <input
             type="date"
             value={hasta}
             onChange={(e) => setHasta(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
         </div>
       </div>
@@ -691,7 +741,7 @@ function PestanaEstadoResultados() {
           <TablaSeccion titulo="Costos" filas={data.costos} />
           <TablaSeccion titulo="Gastos" filas={data.gastos} />
 
-          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 grid grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4 grid grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ingresos</p>
               <p className="text-lg font-bold text-gray-800 dark:text-gray-100">${data.resumen.totalIngresos}</p>
@@ -704,7 +754,7 @@ function PestanaEstadoResultados() {
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Gastos</p>
               <p className="text-lg font-bold text-gray-800 dark:text-gray-100">${data.resumen.totalGastos}</p>
             </div>
-            <div className={parseFloat(data.resumen.utilidadNeta) >= 0 ? "bg-emerald-600 rounded-lg p-2 -m-2" : "bg-red-600 rounded-lg p-2 -m-2"}>
+            <div className={parseFloat(data.resumen.utilidadNeta) >= 0 ? "bg-emerald-600 rounded-sm p-2 -m-2" : "bg-red-600 rounded-sm p-2 -m-2"}>
               <p className="text-xs text-white/80 mb-1">Utilidad neta</p>
               <p className="text-lg font-bold text-white">${data.resumen.utilidadNeta}</p>
             </div>

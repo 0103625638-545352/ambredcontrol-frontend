@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
 import { EstadoBadge } from "./EstadoBadge";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "./BuscadorDocumentos";
+import { CLASE_THEAD, Resaltar } from "./FormatoDocumento";
 
 // Una columna de la tabla del Reporteador Principal. "obtenerValor" es la
 // única fuente de verdad: se usa tanto para pintar la celda (con el formato
@@ -57,12 +59,12 @@ function TooltipGrafico({ active, payload }: { active?: boolean; payload?: { pay
   );
 }
 
-function formatearCelda(valor: string | number | null | undefined, formato?: ColumnaReporte<unknown>["formato"]) {
+function formatearCelda(valor: string | number | null | undefined, formato: ColumnaReporte<unknown>["formato"], termino: string) {
   if (valor === null || valor === undefined || valor === "") return "—";
   if (formato === "estado") return <EstadoBadge estado={String(valor)} />;
-  if (formato === "moneda") return `$${Number(valor).toFixed(2)}`;
-  if (formato === "fecha") return new Date(valor).toLocaleDateString("es-EC");
-  return String(valor);
+  if (formato === "moneda") return <span className="font-mono tabular-nums">{Number(valor).toFixed(2)}</span>;
+  if (formato === "fecha") return <span className="font-mono text-xs">{new Date(valor).toLocaleDateString("es-EC")}</span>;
+  return <Resaltar texto={String(valor)} termino={termino} />;
 }
 
 // Primer día del mes actual → hoy, como fecha por defecto al abrir cada
@@ -85,8 +87,11 @@ export function ReporteadorTabla<T>({
   campoMonto,
   campoFechaGrafico,
 }: Props<T>) {
-  const [desde, setDesde] = useState(primerDiaMes());
-  const [hasta, setHasta] = useState(hoyISO());
+  // Buscador compartido de los listados: Desde/Hasta van al servidor (como
+  // antes, arrancando en "primer día del mes → hoy"); el texto (en todas
+  // las columnas) y el estado filtran en el navegador lo que ya llegó.
+  const filtros = useFiltrosListado(sinPaginacion, { desde: primerDiaMes(), hasta: hoyISO() });
+  const { desde, hasta } = filtros;
 
   const { data: filas, isLoading } = useQuery({
     queryKey: ["reporteador", endpoint, desde, hasta],
@@ -94,7 +99,20 @@ export function ReporteadorTabla<T>({
       (await api.get<T[]>(endpoint, { params: { desde: desde || undefined, hasta: hasta || undefined } })).data,
   });
 
-  const filasOrdenadas = useMemo(() => filas ?? [], [filas]);
+  const columnaEstado = columnas.find((c) => c.formato === "estado");
+  const filasOrdenadas =
+    filtrarLocal(filas, filtros, {
+      textos: (fila) => columnas.filter((c) => c.formato !== "moneda").map((c) => c.obtenerValor(fila)),
+      estado: columnaEstado ? (fila) => String(columnaEstado.obtenerValor(fila) ?? "") : undefined,
+    }) ?? [];
+  // Estados que realmente aparecen en el período (para el filtro).
+  const opcionesEstado =
+    columnaEstado && filas
+      ? Array.from(new Set(filas.map((f) => String(columnaEstado.obtenerValor(f) ?? "")).filter(Boolean)))
+          .sort()
+          .map((v) => ({ valor: v, etiqueta: v.charAt(0) + v.slice(1).toLowerCase() }))
+      : undefined;
+  const totalMonto = campoMonto ? filasOrdenadas.reduce((acumulado, fila) => acumulado + campoMonto(fila), 0) : null;
 
   const datosGrafico = useMemo(() => {
     if (!campoMonto || !campoFechaGrafico) return null;
@@ -119,103 +137,97 @@ export function ReporteadorTabla<T>({
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Desde</label>
-          <input
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Hasta</label>
-          <input
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
-          />
-        </div>
-        <button
-          onClick={() => {
-            setDesde("");
-            setHasta("");
-          }}
-          className="text-xs text-sky-600 dark:text-sky-400 hover:underline pb-1.5"
-        >
-          Ver todo (sin filtro)
-        </button>
-        <div className="flex-1" />
-        <button
-          onClick={exportarExcel}
-          disabled={filasOrdenadas.length === 0}
-          className="bg-brand-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
-        >
-          Exportar a Excel
-        </button>
-      </div>
-
+    <div className="space-y-4">
       {datosGrafico && datosGrafico.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Total por día</p>
+        <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-2">Total por día</p>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={datosGrafico} barCategoryGap={2} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
               <XAxis dataKey="fecha" tickFormatter={aFechaCorta} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
               <Tooltip content={<TooltipGrafico />} cursor={{ fill: "var(--chart-grid)" }} />
-              <Bar dataKey="total" fill="var(--chart-series-1)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+              <Bar dataKey="total" fill="var(--chart-series-1)" radius={[1, 1, 0, 0]} maxBarSize={24} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
-            <tr>
-              {columnas.map((c) => (
-                <th key={c.clave} className="px-4 py-2 whitespace-nowrap">{c.etiqueta}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
+      <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar en el reporte · cualquier columna"
+          placeholder="Ej: número, cliente, producto..."
+          opcionesEstado={opcionesEstado}
+          mostrarPago={false}
+          autoFocus
+          extras={
+            <button
+              type="button"
+              onClick={exportarExcel}
+              disabled={filasOrdenadas.length === 0}
+              className="bg-brand-700 text-white px-3 py-1.5 rounded-sm text-xs font-semibold hover:bg-brand-800 disabled:opacity-40"
+            >
+              Exportar a Excel
+            </button>
+          }
+        />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className={CLASE_THEAD}>
               <tr>
-                <td colSpan={columnas.length} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  Cargando...
-                </td>
-              </tr>
-            )}
-            {!isLoading && filasOrdenadas.length === 0 && (
-              <tr>
-                <td colSpan={columnas.length} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  Sin resultados en este rango de fechas
-                </td>
-              </tr>
-            )}
-            {filasOrdenadas.map((fila) => (
-              <tr
-                key={filaId(fila)}
-                onClick={() => onVerDetalle?.(fila)}
-                className={`border-t border-gray-100 dark:border-gray-700 ${
-                  onVerDetalle ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/60" : ""
-                }`}
-              >
                 {columnas.map((c) => (
-                  <td key={c.clave} className="px-4 py-2 whitespace-nowrap">
-                    {formatearCelda(c.obtenerValor(fila), c.formato)}
-                  </td>
+                  <th key={c.clave} className={`px-4 py-2 whitespace-nowrap ${c.formato === "moneda" ? "text-right" : ""}`}>
+                    {c.etiqueta}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={columnas.length} className="px-4 py-6 text-center text-gray-400 dark:text-gray-500">
+                    Cargando...
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filasOrdenadas.length === 0 && (
+                <tr>
+                  <td colSpan={columnas.length} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                    {filas?.length ? "Ningún registro coincide con la búsqueda." : "Sin resultados en este rango de fechas"}
+                  </td>
+                </tr>
+              )}
+              {filasOrdenadas.map((fila) => (
+                <tr
+                  key={filaId(fila)}
+                  onClick={() => onVerDetalle?.(fila)}
+                  className={`border-t border-stone-100 dark:border-gray-700 ${
+                    onVerDetalle ? "cursor-pointer hover:bg-stone-50 dark:hover:bg-gray-700/40" : ""
+                  }`}
+                >
+                  {columnas.map((c) => (
+                    <td key={c.clave} className={`px-4 py-2 whitespace-nowrap ${c.formato === "moneda" ? "text-right" : ""}`}>
+                      {formatearCelda(c.obtenerValor(fila), c.formato, filtros.busquedaAplicada)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 py-2.5 border-t-2 border-gray-900 dark:border-gray-200">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            {filasOrdenadas.length} registro{filasOrdenadas.length === 1 ? "" : "s"}
+            {filtros.hayFiltros ? " · según filtro" : ""}
+          </span>
+          {totalMonto !== null && (
+            <span className="text-sm font-bold text-gray-900 dark:text-gray-50">
+              TOTAL USD <span className="font-mono tabular-nums ml-2">{totalMonto.toFixed(2)}</span>
+            </span>
+          )}
+        </div>
       </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{filasOrdenadas.length} registro(s)</p>
     </div>
   );
 }

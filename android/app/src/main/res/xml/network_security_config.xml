@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solo en builds DEBUG: confía también en certificados raíz instalados por el
+     usuario en el celular — el rootCA.pem de mkcert (carpeta "certificados y
+     docuemntos para celular") con el que el backend sirve HTTPS en la red
+     local. Android, por defecto, ignora esos certificados dentro de las apps.
+     Un build RELEASE no los acepta: en producción el servidor tiene que tener
+     un certificado real (Let's Encrypt), ver ANDROID.md. -->
+<network-security-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

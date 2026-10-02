@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
-import { urlArchivoSubido, type EquipoDejadoVisita } from "../api/client";
+import { urlArchivoSubido, type EquipoDejadoVisita, type MaterialUtilizadoVisita, type TipoTrabajoVisita } from "../api/client";
 import { MapaVisita } from "./MapaVisita";
+
+const ETIQUETA_TIPO_TRABAJO: Record<TipoTrabajoVisita, string> = {
+  INSTALACION_NUEVA: "Instalación nueva",
+  MEJORA_EXISTENTE: "Mejora / cliente existente",
+};
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   PENDIENTE: "Pendiente",
@@ -27,6 +32,7 @@ interface VisitaParaTarjeta {
   estado: "PENDIENTE" | "COMPLETADA" | "OMITIDA";
   esUrgente?: boolean;
   direccion: string | null;
+  motivoVisita?: string | null;
   latitud?: string;
   longitud?: string;
   latitudLlegada?: string | null;
@@ -36,6 +42,8 @@ interface VisitaParaTarjeta {
   fotoTrabajoUrl?: string | null;
   fotoViviendaUrl?: string | null;
   equiposDejados?: EquipoDejadoVisita[];
+  tipoTrabajo?: TipoTrabajoVisita | null;
+  materialesUtilizados?: MaterialUtilizadoVisita[];
 }
 
 // Una visita técnica con su acta completa (trabajo hecho, equipos dejados,
@@ -47,6 +55,7 @@ interface VisitaParaTarjeta {
 // children en vez de armarse adentro.
 export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaParaTarjeta; encabezado: ReactNode }) {
   const equipos = visita.equiposDejados ?? [];
+  const materiales = visita.materialesUtilizados ?? [];
 
   const tieneUbicacionPlaneada = visita.latitud != null && visita.longitud != null;
   const distancia = visita.distanciaAlPunto != null ? Number(visita.distanciaAlPunto) : null;
@@ -55,7 +64,7 @@ export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaPar
   return (
     <div
       className={`border rounded-md p-3 ${
-        visita.esUrgente ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/10" : "border-gray-200 dark:border-gray-700"
+        visita.esUrgente ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/10" : "border-stone-300 dark:border-gray-700"
       }`}
     >
       <div className="flex justify-between items-start gap-2 mb-1">
@@ -65,8 +74,13 @@ export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaPar
             {encabezado}
           </p>
           {visita.direccion && <p className="text-xs text-gray-500 dark:text-gray-400">{visita.direccion}</p>}
+          {visita.motivoVisita && (
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+              <span className="font-medium">Motivo de la visita:</span> {visita.motivoVisita}
+            </p>
+          )}
         </div>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium shrink-0 ${CLASE_ESTADO[visita.estado]}`}>
+        <span className={`px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider font-semibold shrink-0 ${CLASE_ESTADO[visita.estado]}`}>
           {ETIQUETA_ESTADO[visita.estado]}
         </span>
       </div>
@@ -111,6 +125,12 @@ export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaPar
         </p>
       )}
 
+      {visita.tipoTrabajo && (
+        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+          <span className="font-medium">Tipo:</span> {ETIQUETA_TIPO_TRABAJO[visita.tipoTrabajo]}
+        </p>
+      )}
+
       {equipos.length > 0 && (
         <div className="mt-2">
           <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-1">Equipos dejados</p>
@@ -135,6 +155,28 @@ export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaPar
         </div>
       )}
 
+      {materiales.length > 0 && (
+        <div className="mt-2">
+          <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-1">Materiales utilizados</p>
+          <table className="w-full text-xs">
+            <thead className="text-gray-400 dark:text-gray-500 text-left">
+              <tr>
+                <th className="pr-2 font-normal">Material</th>
+                <th className="font-normal">Cantidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {materiales.map((m) => (
+                <tr key={m.id} className="text-gray-700 dark:text-gray-300">
+                  <td className="pr-2 py-0.5">{m.descripcion}</td>
+                  <td className="py-0.5">{m.cantidad} {m.unidad}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {(visita.fotoTrabajoUrl || visita.fotoViviendaUrl) && (
         <div className="flex gap-3 mt-2">
           {visita.fotoTrabajoUrl && (
@@ -152,7 +194,7 @@ export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaPar
         </div>
       )}
 
-      {!visita.descripcionTrabajo && equipos.length === 0 && !visita.fotoTrabajoUrl && !visita.fotoViviendaUrl && (
+      {!visita.descripcionTrabajo && equipos.length === 0 && materiales.length === 0 && !visita.fotoTrabajoUrl && !visita.fotoViviendaUrl && (
         <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-1">Sin detalle de trabajo registrado.</p>
       )}
     </div>

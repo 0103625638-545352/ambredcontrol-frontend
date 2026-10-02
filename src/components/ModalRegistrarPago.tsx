@@ -135,7 +135,7 @@ export function ModalRegistrarPago({
         )}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="block text-xs text-gray-600 dark:text-gray-400">Monto</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Monto</label>
             {!proximaCuota && (
               <button
                 type="button"
@@ -157,13 +157,13 @@ export function ModalRegistrarPago({
             placeholder="0.00"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
-            className={`w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-gray-100 ${
-              proximaCuota ? "bg-gray-100 dark:bg-gray-900" : "bg-white dark:bg-gray-700"
+            className={`w-full border border-stone-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-gray-100 ${
+              proximaCuota ? "bg-stone-100 dark:bg-gray-900" : "bg-white dark:bg-gray-700"
             }`}
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Forma de pago</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Forma de pago</label>
           <select
             value={formaPago}
             onChange={(e) => {
@@ -171,7 +171,7 @@ export function ModalRegistrarPago({
               setCuentaBancariaId("");
               setBancoOrigenId("");
             }}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           >
             {FORMAS_PAGO.map((forma) => (
               <option key={forma} value={forma}>
@@ -182,7 +182,7 @@ export function ModalRegistrarPago({
         </div>
         {exigeCuentaBancaria && (
           <div>
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Cuenta bancaria</label>
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Cuenta bancaria</label>
             {cuentasBancarias?.length === 0 ? (
               <p className="text-xs text-amber-600 dark:text-amber-400">
                 No hay cuentas bancarias configuradas — créalas en Administración &gt; Cuentas Bancarias.
@@ -192,7 +192,7 @@ export function ModalRegistrarPago({
                 required
                 value={cuentaBancariaId}
                 onChange={(e) => setCuentaBancariaId(Number(e.target.value))}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               >
                 <option value="" disabled>
                   Selecciona una cuenta
@@ -210,13 +210,13 @@ export function ModalRegistrarPago({
           <div className="grid grid-cols-2 gap-3">
             <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco de procedencia" />
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de cuenta de origen</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">N° de cuenta de origen</label>
               <input
                 type="text"
                 placeholder="Cuenta de la que salió el dinero"
                 value={numeroCuentaOrigen}
                 onChange={(e) => setNumeroCuentaOrigen(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               />
             </div>
           </div>
@@ -226,7 +226,7 @@ export function ModalRegistrarPago({
             <div className="grid grid-cols-3 gap-3">
               <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Últimos 4 dígitos</label>
+                <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Últimos 4 dígitos</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -234,15 +234,15 @@ export function ModalRegistrarPago({
                   placeholder="1234"
                   value={tarjetaUltimosDigitos}
                   onChange={(e) => setTarjetaUltimosDigitos(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                  className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+                <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Tipo</label>
                 <select
                   value={tarjetaTipo}
                   onChange={(e) => setTarjetaTipo(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                  className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                 >
                   <option value="DEBITO">Débito</option>
                   <option value="CREDITO">Crédito</option>
@@ -251,23 +251,23 @@ export function ModalRegistrarPago({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de referencia</label>
+                <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">N° de referencia</label>
                 <input
                   type="text"
                   placeholder="Del voucher del datáfono"
                   value={tarjetaReferencia}
                   onChange={(e) => setTarjetaReferencia(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                  className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de lote</label>
+                <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">N° de lote</label>
                 <input
                   type="text"
                   placeholder="Del voucher del datáfono"
                   value={tarjetaLote}
                   onChange={(e) => setTarjetaLote(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                  className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                 />
               </div>
             </div>
@@ -277,40 +277,40 @@ export function ModalRegistrarPago({
           <div className="grid grid-cols-3 gap-3">
             <SelectorBanco value={bancoOrigenId} onChange={setBancoOrigenId} label="Banco emisor" />
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">N° de cheque</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">N° de cheque</label>
               <input
                 type="text"
                 placeholder="Ej: 000123"
                 value={chequeNumero}
                 onChange={(e) => setChequeNumero(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Fecha de cobro</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Fecha de cobro</label>
               <input
                 type="date"
                 value={chequeFechaCobro}
                 onChange={(e) => setChequeFechaCobro(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               />
             </div>
           </div>
         )}
         <div>
-          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Referencia (opcional)</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Referencia (opcional)</label>
           <input
             type="text"
             placeholder="Ej: número de comprobante de transferencia"
             value={referencia}
             onChange={(e) => setReferencia(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
         </div>
         <button
           type="submit"
           disabled={registrarPago.isPending || (exigeCuentaBancaria && !cuentaBancariaId)}
-          className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+          className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
         >
           {registrarPago.isPending ? "Registrando..." : "Registrar pago"}
         </button>

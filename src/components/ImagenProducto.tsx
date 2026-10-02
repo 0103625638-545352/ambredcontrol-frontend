@@ -17,7 +17,7 @@ export function ImagenProducto({ producto, tamano = 40, className = "" }: Props)
     return (
       <div
         style={estiloTamano}
-        className={`flex items-center justify-center rounded-md bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-500 shrink-0 ${className}`}
+        className={`flex items-center justify-center rounded-md bg-stone-100 dark:bg-gray-700 text-gray-300 dark:text-gray-500 shrink-0 ${className}`}
       >
         <ImageOff strokeWidth={1.5} className="w-1/2 h-1/2" />
       </div>

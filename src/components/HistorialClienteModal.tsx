@@ -96,19 +96,19 @@ export function HistorialClienteModal({ clienteId, nombreCliente, onCerrar }: Pr
         ((pestana === "compras" && data && data.length > 0) || (pestana === "visitas" && visitas && visitas.length > 0)) && (
           <button
             onClick={pestana === "compras" ? exportarExcelCompras : exportarExcelVisitas}
-            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
+            className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800"
           >
             Exportar a Excel
           </button>
         )
       }
     >
-      <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4">
+      <div className="flex gap-4 border-b border-stone-300 dark:border-gray-700 mb-4">
         <button
           onClick={() => setPestana("compras")}
           className={`pb-2 text-sm font-medium border-b-2 -mb-px ${
             pestana === "compras"
-              ? "border-slate-700 dark:border-slate-300 text-slate-800 dark:text-slate-100"
+              ? "border-brand-700 dark:border-brand-400 text-gray-800 dark:text-gray-100"
               : "border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           }`}
         >
@@ -118,7 +118,7 @@ export function HistorialClienteModal({ clienteId, nombreCliente, onCerrar }: Pr
           onClick={() => setPestana("visitas")}
           className={`pb-2 text-sm font-medium border-b-2 -mb-px ${
             pestana === "visitas"
-              ? "border-slate-700 dark:border-slate-300 text-slate-800 dark:text-slate-100"
+              ? "border-brand-700 dark:border-brand-400 text-gray-800 dark:text-gray-100"
               : "border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           }`}
         >
@@ -134,7 +134,7 @@ export function HistorialClienteModal({ clienteId, nombreCliente, onCerrar }: Pr
           )}
           {data && data.length > 0 && (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+              <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                 <tr>
                   <th className="px-3 py-2">Fecha</th>
                   <th className="px-3 py-2">Tipo</th>
@@ -147,7 +147,7 @@ export function HistorialClienteModal({ clienteId, nombreCliente, onCerrar }: Pr
               </thead>
               <tbody>
                 {data.map((item, i) => (
-                  <tr key={i} className="border-t border-gray-100 dark:border-gray-700">
+                  <tr key={i} className="border-t border-stone-100 dark:border-gray-700">
                     <td className="px-3 py-2">{new Date(item.fecha).toLocaleDateString("es-EC")}</td>
                     <td className="px-3 py-2">{etiquetasTipo[item.tipo]}</td>
                     <td className="px-3 py-2 font-mono text-xs">{item.documento}</td>

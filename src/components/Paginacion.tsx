@@ -16,15 +16,15 @@ export function Paginacion({ page, totalPaginas, total, onCambiarPagina }: Props
   if (totalPaginas <= 1) return null;
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700 text-sm">
-      <span className="text-gray-500 dark:text-gray-400">
+    <div className="flex items-center justify-between px-4 py-3 border-t border-stone-100 dark:border-gray-700 text-sm">
+      <span className="font-mono text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
         Página {page} de {totalPaginas} · {total} registro{total === 1 ? "" : "s"}
       </span>
       <div className="flex gap-2">
         <button
           onClick={() => onCambiarPagina(page - 1)}
           disabled={page <= 1}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-sm border border-stone-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold text-xs disabled:opacity-40 disabled:cursor-not-allowed hover:bg-stone-50 dark:hover:bg-gray-700"
         >
           <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2} />
           Anterior
@@ -32,7 +32,7 @@ export function Paginacion({ page, totalPaginas, total, onCambiarPagina }: Props
         <button
           onClick={() => onCambiarPagina(page + 1)}
           disabled={page >= totalPaginas}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-sm border border-stone-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold text-xs disabled:opacity-40 disabled:cursor-not-allowed hover:bg-stone-50 dark:hover:bg-gray-700"
         >
           Siguiente
           <ChevronRight className="w-3.5 h-3.5" strokeWidth={2} />

@@ -1,12 +1,39 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { api, abrirPdfEnNuevaPestana, type Producto, type Cliente, type Proforma, type ProformaConDetalle, type RespuestaPaginada } from "../api/client";
-import { ImagenProducto } from "../components/ImagenProducto";
+import { api, abrirPdfEnNuevaPestana, type Producto, type Cliente, type Proforma, type ProformaConDetalle } from "../api/client";
 import { BuscadorCliente } from "../components/BuscadorCliente";
 import { EstadoBadge } from "../components/EstadoBadge";
 import { Paginacion } from "../components/Paginacion";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
+import {
+  CLASE_CAMPO,
+  CLASE_SOLO_LECTURA,
+  CLASE_TH,
+  CLASE_THEAD,
+  CLASE_CAMPO_CELDA,
+  MarcoDocumento,
+  Sello,
+  ConteoItems,
+  CabeceraDocumento,
+  EtiquetaCabecera,
+  BuscadorProductosDocumento,
+  DetalleDocumento,
+  FilaDetalleVacia,
+  CuadroTotales,
+  FilaTotal,
+  BotonConfirmar,
+  MensajeError,
+  SeccionListado,
+  fechaHoy,
+  Resaltar,
+} from "../components/FormatoDocumento";
+import {
+  useFiltrosListado,
+  BarraBuscadorDocumentos,
+  PieResumenListado,
+  type RespuestaConResumen,
+} from "../components/BuscadorDocumentos";
 
 const TAMANO_PAGINA = 20;
 
@@ -28,6 +55,8 @@ export function ProformasPage() {
   const [validaHasta, setValidaHasta] = useState("");
   const [busquedaProducto, setBusquedaProducto] = useState("");
   const [pagina, setPagina] = useState(1);
+  // Buscador dinámico del listado (ver components/BuscadorDocumentos.tsx).
+  const filtros = useFiltrosListado(setPagina);
 
   const { data: productos } = useQuery({
     queryKey: ["productos"],
@@ -43,9 +72,9 @@ export function ProformasPage() {
   );
 
   const { data: respuestaProformas, isLoading: cargandoProformas } = useQuery({
-    queryKey: ["proformas", pagina],
+    queryKey: ["proformas", pagina, ...filtros.clave],
     queryFn: async () =>
-      (await api.get<RespuestaPaginada<Proforma>>("/proformas", { params: { page: pagina, pageSize: TAMANO_PAGINA } })).data,
+      (await api.get<RespuestaConResumen<Proforma>>("/proformas", { params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params } })).data,
     placeholderData: keepPreviousData,
   });
   const proformas = respuestaProformas?.datos;
@@ -186,50 +215,35 @@ export function ProformasPage() {
     if (ok) convertirANotaVenta.mutate(p.id);
   }
 
+  // Desglose por tarifa de IVA, como el RIDE — misma estimación que
+  // totalCarrito, solo separada para mostrarla.
+  const subtotalPorTarifa = carrito.reduce<Record<number, number>>((acumulado, item) => {
+    const tarifa = parseFloat(item.producto.ivaPorcentaje);
+    acumulado[tarifa] = (acumulado[tarifa] ?? 0) + (precioMostrado(item.producto) ?? 0) * item.cantidad;
+    return acumulado;
+  }, {});
+  const tarifasConIva = Object.keys(subtotalPorTarifa)
+    .map(Number)
+    .filter((t) => t > 0)
+    .sort((a, b) => b - a);
+  const guardando = crearProforma.isPending || editarProforma.isPending;
+  const errorGuardar = editandoId !== null ? editarProforma.error : crearProforma.error;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Proformas</h2>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
-          Cotización con el mismo formato de una factura, pero no es un comprobante electrónico y no descuenta stock.
-        </p>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Columna izquierda: buscar productos para agregar */}
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Productos</h3>
-            <input
-              type="text"
-              placeholder="Buscar por nombre o código..."
-              value={busquedaProducto}
-              onChange={(e) => setBusquedaProducto(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full mb-3"
-            />
-            {productosFiltrados?.length === 0 && (
-              <p className="text-sm text-gray-400 dark:text-gray-500">Sin resultados para "{busquedaProducto}"</p>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              {productosFiltrados?.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => agregarAlCarrito(p)}
-                  className="flex items-center gap-3 text-left border border-gray-200 dark:border-gray-700 rounded-md p-3 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <ImagenProducto producto={p} tamano={40} />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{p.nombre}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {precioMostrado(p) !== null ? `$${precioMostrado(p)!.toFixed(2)}` : "Sin costo"}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Columna derecha: datos de la proforma */}
-          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex flex-col">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Datos de la proforma</h3>
-
+      <MarcoDocumento
+        titulo={editandoId !== null ? "Editar proforma" : "Nueva proforma"}
+        sello={
+          <>
+            <ConteoItems cantidad={carrito.length} />
+            {editandoId !== null ? <Sello tono="marca">Editando</Sello> : <Sello>Borrador</Sello>}
+          </>
+        }
+        aviso="Cotización con el mismo formato de una factura, pero no es un comprobante electrónico y no descuenta stock."
+      >
+        <CabeceraDocumento>
+          <EtiquetaCabecera>Cliente</EtiquetaCabecera>
+          <div className="col-span-3 [&>div]:mb-0">
             <BuscadorCliente
               clienteId={clienteId}
               onSeleccionar={(id, cliente) => {
@@ -237,88 +251,150 @@ export function ProformasPage() {
                 setClienteSeleccionado(cliente ?? null);
               }}
             />
+          </div>
 
-            <div className="mb-3">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Válida hasta (opcional)</label>
-              <input
-                type="date"
-                value={validaHasta}
-                onChange={(e) => setValidaHasta(e.target.value)}
-                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full"
-              />
-            </div>
+          <EtiquetaCabecera>Tipo de precio</EtiquetaCabecera>
+          <div className={CLASE_SOLO_LECTURA}>
+            {clienteSeleccionado?.tipoPrecio
+              ? `${clienteSeleccionado.tipoPrecio.nombre} (+${Number(clienteSeleccionado.tipoPrecio.porcentajeGanancia)}%)`
+              : "—"}
+          </div>
+          <EtiquetaCabecera>Fecha emisión</EtiquetaCabecera>
+          <div className={`${CLASE_SOLO_LECTURA} font-mono`}>{fechaHoy()}</div>
 
-            <div className="flex-1 space-y-2 mb-3">
-              {carrito.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">Sin productos agregados</p>}
-              {carrito.map((item) => (
-                <div key={item.producto.id} className="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-700 pb-2">
-                  <div>
-                    <p className="font-medium text-gray-800 dark:text-gray-100">{item.producto.nombre}</p>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      {precioMostrado(item.producto) !== null ? `$${precioMostrado(item.producto)!.toFixed(2)} c/u` : "Sin costo — no se puede cotizar"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
+          <EtiquetaCabecera>Válida hasta</EtiquetaCabecera>
+          <input type="date" value={validaHasta} onChange={(e) => setValidaHasta(e.target.value)} className={CLASE_CAMPO} />
+        </CabeceraDocumento>
+
+        <BuscadorProductosDocumento
+          busqueda={busquedaProducto}
+          onBusqueda={setBusquedaProducto}
+          productos={productosFiltrados}
+          onElegir={(p) => {
+            agregarAlCarrito(p);
+            setBusquedaProducto("");
+          }}
+          infoDerecha={(p) => {
+            const precio = precioMostrado(p);
+            return precio !== null ? precio.toFixed(2) : "Sin costo";
+          }}
+          aviso={!clienteSeleccionado ? "Elige primero el cliente para ver los precios de su categoría." : undefined}
+        />
+
+        <DetalleDocumento>
+          <thead>
+            <tr className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700">
+              <th className={`${CLASE_TH} w-10`}>#</th>
+              <th className={`${CLASE_TH} w-32`}>Código</th>
+              <th className={CLASE_TH}>Descripción</th>
+              <th className={`${CLASE_TH} w-24 text-right`}>Cantidad</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>Precio unit.</th>
+              <th className={`${CLASE_TH} w-16 text-right`}>IVA</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>Subtotal</th>
+              <th className={`${CLASE_TH} w-10`}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {carrito.length === 0 && (
+              <FilaDetalleVacia columnas={8}>Agrega productos con el buscador o el catálogo.</FilaDetalleVacia>
+            )}
+            {carrito.map((item, indice) => {
+              const precio = precioMostrado(item.producto);
+              return (
+                <tr key={item.producto.id} className="border-b border-stone-100 dark:border-gray-700/60 last:border-b-0">
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-400">{indice + 1}</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-600 dark:text-gray-300">{item.producto.codigo}</td>
+                  <td className="px-3 py-1.5 text-gray-800 dark:text-gray-100 uppercase text-[13px]">{item.producto.nombre}</td>
+                  <td className="px-3 py-1 text-right">
                     <input
                       type="number"
                       min={1}
                       value={item.cantidad}
                       onChange={(e) => cambiarCantidad(item.producto.id, Number(e.target.value))}
-                      className="w-14 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-1 py-1 text-center"
+                      className={`${CLASE_CAMPO_CELDA} w-16`}
                     />
-                    <button onClick={() => quitarDelCarrito(item.producto.id)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300">
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-right tabular-nums">
+                    {precio !== null ? (
+                      precio.toFixed(4)
+                    ) : (
+                      <span className="text-red-600 dark:text-red-400 font-sans text-xs">Sin costo</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-right text-gray-500 dark:text-gray-400">
+                    {Number(item.producto.ivaPorcentaje)}%
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-right tabular-nums font-medium text-gray-900 dark:text-gray-50">
+                    {((precio ?? 0) * item.cantidad).toFixed(2)}
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      onClick={() => quitarDelCarrito(item.producto.id)}
+                      title="Quitar del detalle"
+                      className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                    >
                       ✕
                     </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </DetalleDocumento>
 
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-              <div className="flex justify-between font-semibold text-gray-800 dark:text-gray-100 mb-3">
-                <span>Total (aprox.)</span>
-                <span>${totalCarrito.toFixed(2)}</span>
-              </div>
-              {editandoId !== null && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">Editando proforma existente</p>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-4 items-start">
+          <p className="text-xs text-gray-400 dark:text-gray-500 lg:pt-2">
+            El precio se toma de la categoría de precio del cliente. Al convertirla en factura o nota de venta se
+            recalcula con el costo vigente de cada producto.
+          </p>
+          <div className="space-y-3">
+            <CuadroTotales total={totalCarrito}>
+              {tarifasConIva.map((tarifa) => (
+                <FilaTotal key={`sub-${tarifa}`} etiqueta={`Subtotal ${tarifa}%`} valor={subtotalPorTarifa[tarifa]} />
+              ))}
+              {tarifasConIva.length === 0 && <FilaTotal etiqueta="Subtotal gravado" valor={0} />}
+              <FilaTotal etiqueta="Subtotal 0%" valor={subtotalPorTarifa[0] ?? 0} />
+              {tarifasConIva.map((tarifa) => (
+                <FilaTotal key={`iva-${tarifa}`} etiqueta={`IVA ${tarifa}%`} valor={(subtotalPorTarifa[tarifa] * tarifa) / 100} />
+              ))}
+            </CuadroTotales>
+            <BotonConfirmar
+              onClick={() => (editandoId !== null ? editarProforma.mutate() : crearProforma.mutate())}
+              disabled={carrito.length === 0 || !clienteId || guardando}
+            >
+              {editandoId !== null
+                ? editarProforma.isPending
+                  ? "Guardando..."
+                  : "Guardar cambios"
+                : crearProforma.isPending
+                  ? "Generando..."
+                  : "Generar proforma"}
+            </BotonConfirmar>
+            {editandoId !== null && (
               <button
-                onClick={() => (editandoId !== null ? editarProforma.mutate() : crearProforma.mutate())}
-                disabled={carrito.length === 0 || !clienteId || crearProforma.isPending || editarProforma.isPending}
-                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
+                onClick={cancelarEdicion}
+                className="w-full font-mono text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
               >
-                {editandoId !== null
-                  ? editarProforma.isPending
-                    ? "Guardando..."
-                    : "Guardar cambios"
-                  : crearProforma.isPending
-                    ? "Generando..."
-                    : "Generar proforma"}
+                Cancelar edición
               </button>
-              {editandoId !== null && (
-                <button
-                  onClick={cancelarEdicion}
-                  className="w-full text-center text-xs text-gray-500 dark:text-gray-400 hover:underline mt-2"
-                >
-                  Cancelar edición
-                </button>
-              )}
-              {(editandoId !== null ? editarProforma.isError : crearProforma.isError) && (
-                <p className="text-red-600 dark:text-red-400 text-sm mt-2">
-                  {((editandoId !== null ? editarProforma.error : crearProforma.error) as any)?.response?.data?.error ??
-                    "Error al guardar la proforma"}
-                </p>
-              )}
-            </div>
+            )}
+            {(editandoId !== null ? editarProforma.isError : crearProforma.isError) && (
+              <MensajeError>{(errorGuardar as any)?.response?.data?.error ?? "Error al guardar la proforma"}</MensajeError>
+            )}
           </div>
         </div>
-      </div>
+      </MarcoDocumento>
 
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Historial de proformas</h2>
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <SeccionListado titulo="Historial de proformas">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · número, cliente o cédula/RUC"
+          placeholder="Ej: 000000045, Tornillo..."
+          opcionesEstado={[{ valor: "CREADA", etiqueta: "Vigente" }, { valor: "CONVERTIDA", etiqueta: "Convertida" }, { valor: "ANULADA", etiqueta: "Anulada" }]}
+          mostrarPago={false}
+        />
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+            <thead className={CLASE_THEAD}>
               <tr>
                 <th className="px-4 py-2">No.</th>
                 <th className="px-4 py-2">Cliente</th>
@@ -336,15 +412,15 @@ export function ProformasPage() {
               )}
               {!cargandoProformas && proformas?.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">No hay proformas registradas</td>
+                  <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">{filtros.hayFiltros ? "Ningún documento coincide con la búsqueda." : "No hay proformas registradas"}</td>
                 </tr>
               )}
               {proformas?.map((p) => (
-                <tr key={p.id} className="border-t border-gray-100 dark:border-gray-700">
-                  <td className="px-4 py-2 font-mono text-xs">{p.secuencial}</td>
-                  <td className="px-4 py-2">{p.cliente.razonSocial}</td>
+                <tr key={p.id} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
+                  <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={p.secuencial} termino={filtros.busquedaAplicada} /></td>
+                  <td className="px-4 py-2"><Resaltar texto={p.cliente.razonSocial} termino={filtros.busquedaAplicada} /></td>
                   <td className="px-4 py-2">{new Date(p.fechaEmision).toLocaleDateString("es-EC")}</td>
-                  <td className="px-4 py-2 text-right">${p.total}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums">{p.total}</td>
                   <td className="px-4 py-2">
                     <EstadoBadge estado={p.estado} />
                     {p.estado === "CONVERTIDA" && (
@@ -356,7 +432,7 @@ export function ProformasPage() {
                   <td className="px-4 py-2 text-right space-x-3">
                     <button
                       onClick={() => abrirPdfEnNuevaPestana(`/proformas/${p.id}/pdf`)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       Ver PDF
                     </button>
@@ -364,7 +440,7 @@ export function ProformasPage() {
                       <>
                         <button
                           onClick={() => iniciarEdicion(p)}
-                          className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                          className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                         >
                           Editar
                         </button>
@@ -393,6 +469,7 @@ export function ProformasPage() {
               ))}
             </tbody>
           </table>
+          <PieResumenListado resumen={respuestaProformas?.resumen} hayFiltros={filtros.hayFiltros} />
           {respuestaProformas && (
             <Paginacion
               page={respuestaProformas.paginacion.page}
@@ -401,8 +478,7 @@ export function ProformasPage() {
               onCambiarPagina={setPagina}
             />
           )}
-        </div>
-      </div>
+      </SeccionListado>
     </div>
   );
 }

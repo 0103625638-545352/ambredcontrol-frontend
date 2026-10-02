@@ -81,7 +81,7 @@ export function ModalHistorialPagos({ endpointBase, documento, queryKeysAInvalid
         data && data.pagos.length > 0 ? (
           <button
             onClick={exportarExcel}
-            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
+            className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800"
           >
             Exportar Excel
           </button>
@@ -91,7 +91,7 @@ export function ModalHistorialPagos({ endpointBase, documento, queryKeysAInvalid
       {isLoading && <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>}
       {data && (
         <>
-          <div className="grid grid-cols-3 gap-3 mb-4 text-sm bg-gray-50 dark:bg-gray-900/40 rounded-md p-3">
+          <div className="grid grid-cols-3 gap-3 mb-4 text-sm bg-stone-50 dark:bg-gray-900/40 rounded-md p-3">
             <div>
               <p className="text-gray-500 dark:text-gray-400">Total</p>
               <p className="font-semibold text-gray-800 dark:text-gray-100">${data.total}</p>
@@ -110,7 +110,7 @@ export function ModalHistorialPagos({ endpointBase, documento, queryKeysAInvalid
             <p className="text-sm text-gray-400 dark:text-gray-500">Todavía no se ha registrado ningún abono.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+              <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
                 <tr>
                   <th className="px-3 py-2">Fecha</th>
                   <th className="px-3 py-2 text-right">Monto</th>
@@ -122,7 +122,7 @@ export function ModalHistorialPagos({ endpointBase, documento, queryKeysAInvalid
               </thead>
               <tbody>
                 {data.pagos.map((p) => (
-                  <tr key={p.id} className="border-t border-gray-100 dark:border-gray-700">
+                  <tr key={p.id} className="border-t border-stone-100 dark:border-gray-700">
                     <td className="px-3 py-2">{new Date(p.fecha).toLocaleString("es-EC")}</td>
                     <td className="px-3 py-2 text-right font-medium">${p.monto}</td>
                     <td className="px-3 py-2">

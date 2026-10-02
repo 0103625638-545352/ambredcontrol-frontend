@@ -46,31 +46,31 @@ export function ModalCrearCuenta({ onCerrar }: Props) {
     <Modal titulo="Nueva cuenta contable" onCerrar={onCerrar}>
       <div className="space-y-3">
         <div>
-          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Código</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Código</label>
           <input
             type="text"
             placeholder="Ej: 6.1.02"
             value={codigo}
             onChange={(e) => setCodigo(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Nombre</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Nombre</label>
           <input
             type="text"
             placeholder="Ej: Servicios básicos"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Tipo</label>
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value as TipoCuentaContable)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           >
             {TIPOS.map((t) => (
               <option key={t.valor} value={t.valor}>
@@ -87,7 +87,7 @@ export function ModalCrearCuenta({ onCerrar }: Props) {
           type="button"
           onClick={() => crearCuenta.mutate()}
           disabled={!formularioValido || crearCuenta.isPending}
-          className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
+          className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-40"
         >
           {crearCuenta.isPending ? "Creando..." : "Crear cuenta"}
         </button>

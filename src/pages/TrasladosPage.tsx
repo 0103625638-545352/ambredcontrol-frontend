@@ -1,10 +1,34 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { api, type Producto, type Sucursal, type Bodega, type Traslado, type RespuestaPaginada } from "../api/client";
-import { ImagenProducto } from "../components/ImagenProducto";
+import { api, type Producto, type Sucursal, type Bodega, type Traslado } from "../api/client";
 import { Paginacion } from "../components/Paginacion";
 import { useToast } from "../components/ToastProvider";
 import { useMiSucursal } from "../context/AuthContext";
+import {
+  CLASE_CAMPO,
+  CLASE_SOLO_LECTURA,
+  CLASE_TH,
+  CLASE_THEAD,
+  CLASE_CAMPO_CELDA,
+  MarcoDocumento,
+  Sello,
+  ConteoItems,
+  CabeceraDocumento,
+  EtiquetaCabecera,
+  BuscadorProductosDocumento,
+  DetalleDocumento,
+  FilaDetalleVacia,
+  BotonConfirmar,
+  MensajeError,
+  SeccionListado,
+  fechaHoy,
+  Resaltar,
+} from "../components/FormatoDocumento";
+import {
+  useFiltrosListado,
+  BarraBuscadorDocumentos,
+  type RespuestaConResumen,
+} from "../components/BuscadorDocumentos";
 
 const TAMANO_PAGINA = 20;
 
@@ -23,6 +47,8 @@ export function TrasladosPage() {
   const [motivo, setMotivo] = useState("");
   const [busquedaProducto, setBusquedaProducto] = useState("");
   const [pagina, setPagina] = useState(1);
+  // Buscador dinámico del listado (ver components/BuscadorDocumentos.tsx).
+  const filtros = useFiltrosListado(setPagina);
 
   // Bodegas de la sucursal del usuario, para elegir el origen — solo puede
   // sacar stock de una bodega de su propia sucursal (el backend re-valida esto).
@@ -71,9 +97,9 @@ export function TrasladosPage() {
   }
 
   const { data: respuestaTraslados, isLoading: cargandoTraslados } = useQuery({
-    queryKey: ["traslados", pagina],
+    queryKey: ["traslados", pagina, ...filtros.clave],
     queryFn: async () =>
-      (await api.get<RespuestaPaginada<Traslado>>("/traslados", { params: { page: pagina, pageSize: TAMANO_PAGINA } })).data,
+      (await api.get<RespuestaConResumen<Traslado>>("/traslados", { params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params } })).data,
     placeholderData: keepPreviousData,
   });
   const traslados = respuestaTraslados?.datos;
@@ -115,147 +141,174 @@ export function TrasladosPage() {
     onError: (error: any) => mostrarToast(error.response?.data?.error ?? "Error al registrar el traslado"),
   });
 
+  const unidadesATrasladar = carrito.reduce((acumulado, item) => acumulado + item.cantidad, 0);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Traslado entre bodegas</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Productos (sin lote)</h3>
-            <input
-              type="text"
-              placeholder="Buscar por nombre o código..."
-              value={busquedaProducto}
-              onChange={(e) => setBusquedaProducto(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full mb-3"
-            />
-            {productosFiltrados?.length === 0 && (
-              <p className="text-sm text-gray-400 dark:text-gray-500">Sin resultados</p>
+      <MarcoDocumento
+        titulo="Traslado entre bodegas"
+        sello={
+          <>
+            <ConteoItems cantidad={carrito.length} />
+            <Sello>Borrador</Sello>
+          </>
+        }
+        aviso="Solo productos sin lote. Puede ser dentro de tu sucursal o hacia una bodega de otra sucursal."
+      >
+        <CabeceraDocumento>
+          <EtiquetaCabecera>Sucursal origen</EtiquetaCabecera>
+          <div className={CLASE_SOLO_LECTURA}>{miSucursal?.nombre ?? "Tu usuario no tiene sucursal asignada"}</div>
+          <EtiquetaCabecera>Fecha</EtiquetaCabecera>
+          <div className={`${CLASE_SOLO_LECTURA} font-mono`}>{fechaHoy()}</div>
+
+          <EtiquetaCabecera>Bodega origen</EtiquetaCabecera>
+          <select
+            value={bodegaOrigenId}
+            onChange={(e) => {
+              setBodegaOrigenId(e.target.value ? Number(e.target.value) : "");
+              setCarrito([]);
+            }}
+            className={CLASE_CAMPO}
+          >
+            <option value="">Selecciona...</option>
+            {bodegasOrigen?.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
+            ))}
+          </select>
+          <EtiquetaCabecera>Bodega destino</EtiquetaCabecera>
+          <select
+            value={bodegaDestinoId}
+            onChange={(e) => setBodegaDestinoId(e.target.value ? Number(e.target.value) : "")}
+            className={CLASE_CAMPO}
+          >
+            <option value="">Selecciona...</option>
+            {sucursales?.map((s) => {
+              const bodegasDeEsaSucursal = bodegasDestinoPorSucursal.get(s.id);
+              if (!bodegasDeEsaSucursal || bodegasDeEsaSucursal.length === 0) return null;
+              return (
+                <optgroup key={s.id} label={s.nombre}>
+                  {bodegasDeEsaSucursal.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.nombre}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
+          </select>
+
+          <EtiquetaCabecera>Motivo</EtiquetaCabecera>
+          <input
+            type="text"
+            placeholder="Opcional"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            className={`${CLASE_CAMPO} col-span-3`}
+          />
+        </CabeceraDocumento>
+
+        <BuscadorProductosDocumento
+          busqueda={busquedaProducto}
+          onBusqueda={setBusquedaProducto}
+          productos={productosFiltrados}
+          onElegir={(p) => {
+            agregarAlCarrito(p);
+            setBusquedaProducto("");
+          }}
+          deshabilitado={(p) => !bodegaOrigenId || stockEnBodegaOrigen(p) <= 0}
+          infoDerecha={(p) => (bodegaOrigenId ? `Stock ${stockEnBodegaOrigen(p)}` : "")}
+          aviso={!bodegaOrigenId ? "Elige primero la bodega de origen para ver su stock." : undefined}
+        />
+
+        <DetalleDocumento>
+          <thead>
+            <tr className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700">
+              <th className={`${CLASE_TH} w-10`}>#</th>
+              <th className={`${CLASE_TH} w-32`}>Código</th>
+              <th className={CLASE_TH}>Descripción</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>Stock origen</th>
+              <th className={`${CLASE_TH} w-28 text-right`}>A trasladar</th>
+              <th className={`${CLASE_TH} w-10`}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {carrito.length === 0 && (
+              <FilaDetalleVacia columnas={6}>Agrega productos con el buscador o el catálogo.</FilaDetalleVacia>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              {productosFiltrados?.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => agregarAlCarrito(p)}
-                  disabled={!bodegaOrigenId || stockEnBodegaOrigen(p) <= 0}
-                  className="flex items-center gap-3 text-left border border-gray-200 dark:border-gray-700 rounded-md p-3 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:hover:border-gray-200"
-                >
-                  <ImagenProducto producto={p} tamano={40} />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{p.nombre}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {bodegaOrigenId ? `Stock en esa bodega: ${stockEnBodegaOrigen(p)}` : "Elige una bodega de origen"}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 flex flex-col">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Datos del traslado</h3>
-
-            <div className="text-sm mb-3">
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Desde (tu sucursal)</label>
-              <p className="border border-gray-200 dark:border-gray-700 rounded-md px-3 py-2 bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300">
-                {miSucursal?.nombre ?? "Tu usuario no tiene sucursal asignada"}
-              </p>
-            </div>
-
-            <select
-              value={bodegaOrigenId}
-              onChange={(e) => {
-                setBodegaOrigenId(e.target.value ? Number(e.target.value) : "");
-                setCarrito([]);
-              }}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm mb-3"
-            >
-              <option value="">Bodega de origen...</option>
-              {bodegasOrigen?.map((b) => (
-                <option key={b.id} value={b.id}>{b.nombre}</option>
-              ))}
-            </select>
-
-            <select
-              value={bodegaDestinoId}
-              onChange={(e) => setBodegaDestinoId(e.target.value ? Number(e.target.value) : "")}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm mb-3"
-            >
-              <option value="">Bodega de destino...</option>
-              {sucursales?.map((s) => {
-                const bodegasDeEsaSucursal = bodegasDestinoPorSucursal.get(s.id);
-                if (!bodegasDeEsaSucursal || bodegasDeEsaSucursal.length === 0) return null;
-                return (
-                  <optgroup key={s.id} label={s.nombre}>
-                    {bodegasDeEsaSucursal.map((b) => (
-                      <option key={b.id} value={b.id}>{b.nombre}</option>
-                    ))}
-                  </optgroup>
-                );
-              })}
-            </select>
-
-            <input
-              type="text"
-              placeholder="Motivo (opcional)"
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm mb-3"
-            />
-
-            <div className="flex-1 space-y-3 mb-3">
-              {carrito.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">Sin productos agregados</p>}
-              {carrito.map((item) => (
-                <div key={item.producto.id} className="border-b border-gray-100 dark:border-gray-700 pb-2">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <p className="font-medium text-gray-800 dark:text-gray-100">{item.producto.nombre}</p>
-                    <button
-                      onClick={() => quitarDelCarrito(item.producto.id)}
-                      className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 dark:text-gray-400">
-                      Cantidad (máx. {stockEnBodegaOrigen(item.producto)})
-                    </label>
+            {carrito.map((item, indice) => {
+              const stock = stockEnBodegaOrigen(item.producto);
+              const excede = item.cantidad > stock;
+              return (
+                <tr key={item.producto.id} className="border-b border-stone-100 dark:border-gray-700/60 last:border-b-0">
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-400">{indice + 1}</td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-gray-600 dark:text-gray-300">{item.producto.codigo}</td>
+                  <td className="px-3 py-1.5 text-gray-800 dark:text-gray-100 uppercase text-[13px]">{item.producto.nombre}</td>
+                  <td className="px-3 py-1.5 font-mono text-right text-gray-500 dark:text-gray-400">{stock}</td>
+                  <td className="px-3 py-1 text-right">
                     <input
                       type="number"
                       min={1}
-                      max={stockEnBodegaOrigen(item.producto)}
+                      max={stock}
                       value={item.cantidad}
                       onChange={(e) => cambiarCantidad(item.producto.id, Number(e.target.value))}
-                      className="w-20 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-1 py-1 text-center text-sm"
+                      title={excede ? `Máximo ${stock}` : undefined}
+                      className={`${CLASE_CAMPO_CELDA} w-20 ${excede ? "border-red-500 text-red-700 dark:text-red-400" : ""}`}
                     />
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </td>
+                  <td className="px-2 py-1.5 text-center">
+                    <button
+                      onClick={() => quitarDelCarrito(item.producto.id)}
+                      title="Quitar del detalle"
+                      className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </DetalleDocumento>
 
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-              <button
-                onClick={() => registrarTraslado.mutate()}
-                disabled={!carritoValido || !bodegaOrigenId || !bodegaDestinoId || registrarTraslado.isPending}
-                className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
-              >
-                {registrarTraslado.isPending ? "Registrando..." : "Registrar traslado"}
-              </button>
-              {registrarTraslado.isError && (
-                <p className="text-red-600 dark:text-red-400 text-sm mt-2">
-                  {(registrarTraslado.error as any)?.response?.data?.error ?? "Error al registrar el traslado"}
-                </p>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-4 items-start">
+          <div />
+          <div className="space-y-3">
+            <div className="border border-stone-300 dark:border-gray-700 text-sm">
+              <div className="flex justify-between px-3 py-1.5 text-gray-700 dark:text-gray-300">
+                <span>Productos</span>
+                <span className="font-mono tabular-nums">{carrito.length}</span>
+              </div>
+              <div className="flex justify-between px-3 py-2.5 border-t-2 border-gray-900 dark:border-gray-200 font-bold text-base text-gray-900 dark:text-gray-50">
+                <span>UNIDADES</span>
+                <span className="font-mono tabular-nums">{unidadesATrasladar}</span>
+              </div>
             </div>
+            <BotonConfirmar
+              onClick={() => registrarTraslado.mutate()}
+              disabled={!carritoValido || !bodegaOrigenId || !bodegaDestinoId || registrarTraslado.isPending}
+            >
+              {registrarTraslado.isPending ? "Registrando..." : "Registrar traslado"}
+            </BotonConfirmar>
+            {registrarTraslado.isError && (
+              <MensajeError>
+                {(registrarTraslado.error as any)?.response?.data?.error ?? "Error al registrar el traslado"}
+              </MensajeError>
+            )}
           </div>
         </div>
-      </div>
+      </MarcoDocumento>
 
-      <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Historial de traslados</h2>
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <SeccionListado titulo="Historial de traslados">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · bodega, sucursal, producto, usuario o motivo"
+          placeholder="Ej: Bodega principal, cable UTP..."
+          mostrarPago={false}
+        />
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+            <thead className={CLASE_THEAD}>
               <tr>
                 <th className="px-4 py-2">Fecha</th>
                 <th className="px-4 py-2">De</th>
@@ -272,16 +325,16 @@ export function TrasladosPage() {
               )}
               {!cargandoTraslados && traslados?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">No hay traslados registrados</td>
+                  <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">{filtros.hayFiltros ? "Ningún documento coincide con la búsqueda." : "No hay traslados registrados"}</td>
                 </tr>
               )}
               {traslados?.map((t) => (
-                <tr key={t.id} className="border-t border-gray-100 dark:border-gray-700">
+                <tr key={t.id} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
                   <td className="px-4 py-2">{new Date(t.createdAt).toLocaleDateString("es-EC")}</td>
                   <td className="px-4 py-2">{t.bodegaOrigen.nombre} <span className="text-gray-400 dark:text-gray-500 text-xs">({t.sucursalOrigen.nombre})</span></td>
                   <td className="px-4 py-2">{t.bodegaDestino.nombre} <span className="text-gray-400 dark:text-gray-500 text-xs">({t.sucursalDestino.nombre})</span></td>
-                  <td className="px-4 py-2">{t.usuario?.nombre ?? "—"}</td>
-                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{t.motivo ?? "—"}</td>
+                  <td className="px-4 py-2"><Resaltar texto={t.usuario?.nombre ?? "—"} termino={filtros.busquedaAplicada} /></td>
+                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400"><Resaltar texto={t.motivo ?? "—"} termino={filtros.busquedaAplicada} /></td>
                 </tr>
               ))}
             </tbody>
@@ -294,8 +347,7 @@ export function TrasladosPage() {
               onCambiarPagina={setPagina}
             />
           )}
-        </div>
-      </div>
+      </SeccionListado>
     </div>
   );
 }

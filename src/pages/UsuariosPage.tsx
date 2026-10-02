@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api, type RespuestaPaginada, type Sucursal, type Bodega, type PuntoDeVenta, type Empleado, type UsuarioAdmin as Usuario } from "../api/client";
 import { Paginacion } from "../components/Paginacion";
 import { Modal } from "../components/Modal";
 import { useToast } from "../components/ToastProvider";
 import { useConfirm } from "../components/ConfirmProvider";
-import { useDebounce } from "../hooks/useDebounce";
 import { PERMISOS } from "../constants/permisos";
+import { useFiltrosListado, BarraBuscadorDocumentos } from "../components/BuscadorDocumentos";
+import { CLASE_CAMPO, CLASE_ETIQUETA, Resaltar } from "../components/FormatoDocumento";
 
 const TAMANO_PAGINA = 20;
 
@@ -122,12 +123,12 @@ function TarjetaSucursales() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Sucursales</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+      <div className="flex justify-between items-center -mx-4 -mt-4 mb-3 px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Sucursales</h3>
         <button
           onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="text-xs font-medium text-sky-600 dark:text-sky-400 hover:underline"
+          className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline"
         >
           {mostrarFormulario ? "Cancelar" : "+ Nueva sucursal"}
         </button>
@@ -146,18 +147,18 @@ function TarjetaSucursales() {
             required
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
           <input
             placeholder="Dirección (opcional)"
             value={form.direccion}
             onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
           <button
             type="submit"
             disabled={crearSucursal.isPending}
-            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-700 text-white py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {crearSucursal.isPending ? "Guardando..." : "Crear sucursal"}
           </button>
@@ -176,7 +177,7 @@ function TarjetaSucursales() {
               </div>
               <button
                 onClick={() => abrirEdicion(s)}
-                className="text-sky-600 dark:text-sky-400 hover:underline text-xs font-medium"
+                className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-semibold"
               >
                 Editar
               </button>
@@ -199,18 +200,18 @@ function TarjetaSucursales() {
               required
               value={formEdicion.nombre}
               onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
             <input
               placeholder="Dirección (opcional)"
               value={formEdicion.direccion}
               onChange={(e) => setFormEdicion({ ...formEdicion, direccion: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
             <button
               type="submit"
               disabled={editarSucursal.isPending}
-              className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+              className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
             >
               {editarSucursal.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -284,12 +285,12 @@ function TarjetaBodegas() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Bodegas</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+      <div className="flex justify-between items-center -mx-4 -mt-4 mb-3 px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Bodegas</h3>
         <button
           onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="text-xs font-medium text-sky-600 dark:text-sky-400 hover:underline"
+          className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline"
         >
           {mostrarFormulario ? "Cancelar" : "+ Nueva bodega"}
         </button>
@@ -308,13 +309,13 @@ function TarjetaBodegas() {
             required
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
           <select
             required
             value={form.sucursalId}
             onChange={(e) => setForm({ ...form, sucursalId: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           >
             <option value="">Sucursal...</option>
             {sucursales?.map((s) => (
@@ -324,7 +325,7 @@ function TarjetaBodegas() {
           <button
             type="submit"
             disabled={crearBodega.isPending}
-            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-700 text-white py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {crearBodega.isPending ? "Guardando..." : "Crear bodega"}
           </button>
@@ -344,7 +345,7 @@ function TarjetaBodegas() {
               <div className="flex gap-3">
                 <button
                   onClick={() => abrirEdicion(b)}
-                  className="text-sky-600 dark:text-sky-400 hover:underline text-xs font-medium"
+                  className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-semibold"
                 >
                   Editar
                 </button>
@@ -378,12 +379,12 @@ function TarjetaBodegas() {
               required
               value={formEdicion.nombre}
               onChange={(e) => setFormEdicion({ nombre: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
             <button
               type="submit"
               disabled={editarBodega.isPending}
-              className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+              className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
             >
               {editarBodega.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -456,12 +457,12 @@ function TarjetaPuntosVenta() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Puntos de venta</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+      <div className="flex justify-between items-center -mx-4 -mt-4 mb-3 px-4 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700">
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Puntos de venta</h3>
         <button
           onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="text-xs font-medium text-sky-600 dark:text-sky-400 hover:underline"
+          className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline"
         >
           {mostrarFormulario ? "Cancelar" : "+ Nuevo punto de venta"}
         </button>
@@ -485,13 +486,13 @@ function TarjetaPuntosVenta() {
             required
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           />
           <select
             required
             value={form.sucursalId}
             onChange={(e) => setForm({ ...form, sucursalId: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-3 py-1.5 text-sm"
           >
             <option value="">Sucursal...</option>
             {sucursales?.map((s) => (
@@ -501,7 +502,7 @@ function TarjetaPuntosVenta() {
           <button
             type="submit"
             disabled={crearPuntoVenta.isPending}
-            className="col-span-2 bg-brand-600 text-white py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-700 text-white py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {crearPuntoVenta.isPending ? "Guardando..." : "Crear punto de venta"}
           </button>
@@ -523,7 +524,7 @@ function TarjetaPuntosVenta() {
               <div className="flex gap-3">
                 <button
                   onClick={() => abrirEdicion(p)}
-                  className="text-sky-600 dark:text-sky-400 hover:underline text-xs font-medium"
+                  className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-semibold"
                 >
                   Editar
                 </button>
@@ -557,12 +558,12 @@ function TarjetaPuntosVenta() {
               required
               value={formEdicion.nombre}
               onChange={(e) => setFormEdicion({ nombre: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
             <button
               type="submit"
               disabled={editarPuntoVenta.isPending}
-              className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+              className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
             >
               {editarPuntoVenta.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -580,15 +581,12 @@ export function UsuariosPage() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [form, setForm] = useState({ nombre: "", usuario: "", password: "", email: "", rol: "CAJERO", permisos: [] as string[], sucursalId: "", empleadoId: "" });
   const [pagina, setPagina] = useState(1);
-  const [busqueda, setBusqueda] = useState("");
-  const busquedaDebounced = useDebounce(busqueda);
+  // Buscador compartido de los listados (en el servidor: la lista pagina),
+  // con filtros propios de rol y sucursal.
+  const filtros = useFiltrosListado(setPagina);
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
   const [formEdicion, setFormEdicion] = useState({ nombre: "", email: "", rol: "CAJERO", permisos: [] as string[], sucursalId: "", empleadoId: "" });
   const [passwordTemporal, setPasswordTemporal] = useState<{ nombre: string; password: string } | null>(null);
-
-  useEffect(() => {
-    setPagina(1);
-  }, [busquedaDebounced]);
 
   const { data: sucursales } = useQuery({
     queryKey: ["sucursales"],
@@ -606,11 +604,11 @@ export function UsuariosPage() {
   });
 
   const { data: respuesta, isLoading } = useQuery({
-    queryKey: ["usuarios", pagina, busquedaDebounced],
+    queryKey: ["usuarios", pagina, ...filtros.clave],
     queryFn: async () =>
       (
         await api.get<RespuestaPaginada<Usuario>>("/usuarios", {
-          params: { page: pagina, pageSize: TAMANO_PAGINA, q: busquedaDebounced || undefined },
+          params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params },
         })
       ).data,
     placeholderData: keepPreviousData,
@@ -687,29 +685,30 @@ export function UsuariosPage() {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Usuarios</h2>
+      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-4">Usuarios</h2>
 
-      <TarjetaSucursales />
-      <TarjetaBodegas />
-      <TarjetaPuntosVenta />
-
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Cuentas de usuario</h3>
-        <button
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
-        >
-          {mostrarFormulario ? "Cancelar" : "+ Nuevo usuario"}
-        </button>
+      <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-2">Estructura de la empresa</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start mb-6">
+        <TarjetaSucursales />
+        <TarjetaBodegas />
+        <TarjetaPuntosVenta />
       </div>
 
-      <input
-        type="text"
-        placeholder="Buscar por nombre o usuario..."
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full mb-4"
-      />
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+          <h3 className="text-base font-bold text-gray-900 dark:text-gray-50">Cuentas de usuario</h3>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+              {respuesta ? `${respuesta.paginacion.total} usuario${respuesta.paginacion.total === 1 ? "" : "s"}` : ""}
+            </span>
+            <button
+              onClick={() => setMostrarFormulario(!mostrarFormulario)}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-3 py-1.5 rounded-sm text-sm font-semibold hover:bg-stone-50 dark:hover:bg-gray-700"
+            >
+              {mostrarFormulario ? "Cancelar" : "+ Nuevo usuario"}
+            </button>
+          </div>
+        </div>
 
       {mostrarFormulario && (
         <form
@@ -717,21 +716,22 @@ export function UsuariosPage() {
             e.preventDefault();
             crearUsuario.mutate();
           }}
-          className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 grid grid-cols-2 gap-3"
+          className="p-4 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700 grid grid-cols-2 gap-3"
         >
           <input
             placeholder="Nombre completo"
             required
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Nombre de usuario (para iniciar sesión)"
             required
+            data-no-mayus="true"
             value={form.usuario}
             onChange={(e) => setForm({ ...form, usuario: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Contraseña"
@@ -739,19 +739,19 @@ export function UsuariosPage() {
             required
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <input
             placeholder="Correo (opcional, para recuperar la contraseña)"
             type="email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="col-span-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="col-span-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
           <select
             value={form.rol}
             onChange={(e) => setForm({ ...form, rol: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           >
             <option value="CAJERO">Personalizado (elige los permisos abajo)</option>
             <option value="ADMIN">Administrador (acceso total)</option>
@@ -760,7 +760,7 @@ export function UsuariosPage() {
             required
             value={form.sucursalId}
             onChange={(e) => setForm({ ...form, sucursalId: e.target.value })}
-            className="col-span-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="col-span-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           >
             <option value="" disabled>Sucursal donde trabaja...</option>
             {sucursales?.map((s) => (
@@ -771,7 +771,7 @@ export function UsuariosPage() {
             <select
               value={form.empleadoId}
               onChange={(e) => setForm({ ...form, empleadoId: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             >
               <option value="">Sin vincular a un empleado técnico</option>
               {empleados?.map((e) => (
@@ -791,7 +791,7 @@ export function UsuariosPage() {
           <button
             type="submit"
             disabled={crearUsuario.isPending}
-            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            className="col-span-2 bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
           >
             {crearUsuario.isPending ? "Guardando..." : "Crear usuario"}
           </button>
@@ -803,9 +803,47 @@ export function UsuariosPage() {
         </form>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · nombre, usuario o email"
+          placeholder="Ej: María, mperez, @gmail.com..."
+          opcionesEstado={[
+            { valor: "ACTIVO", etiqueta: "Activo" },
+            { valor: "INACTIVO", etiqueta: "Inactivo" },
+          ]}
+          mostrarPago={false}
+          extras={
+            <>
+              <label className="flex flex-col gap-1 w-44">
+                <span className={CLASE_ETIQUETA}>Rol</span>
+                <select value={filtros.extra.rol ?? ""} onChange={(e) => filtros.setExtra("rol", e.target.value)} className={CLASE_CAMPO}>
+                  <option value="">Todos</option>
+                  <option value="ADMIN">Administrador</option>
+                  <option value="CAJERO">Acceso personalizado</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 w-44">
+                <span className={CLASE_ETIQUETA}>Sucursal</span>
+                <select
+                  value={filtros.extra.sucursalId ?? ""}
+                  onChange={(e) => filtros.setExtra("sucursalId", e.target.value)}
+                  className={CLASE_CAMPO}
+                >
+                  <option value="">Todas</option>
+                  <option value="sin">Sin asignar</option>
+                  {sucursales?.map((suc) => (
+                    <option key={suc.id} value={suc.id}>
+                      {suc.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          }
+        />
+      <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Nombre</th>
               <th className="px-4 py-2">Usuario</th>
@@ -825,17 +863,17 @@ export function UsuariosPage() {
             {!isLoading && usuarios?.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  {busquedaDebounced ? `Sin resultados para "${busquedaDebounced}"` : "No hay usuarios"}
+                  {filtros.hayFiltros ? "Ningún usuario coincide con la búsqueda." : "No hay usuarios"}
                 </td>
               </tr>
             )}
             {usuarios?.map((u) => (
-              <tr key={u.id} className="border-t border-gray-100 dark:border-gray-700">
-                <td className="px-4 py-2">{u.nombre}</td>
-                <td className="px-4 py-2 font-mono text-xs">{u.usuario}</td>
-                <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{u.email || "—"}</td>
+              <tr key={u.id} className={`border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30 ${u.activo ? "" : "text-gray-400 dark:text-gray-500"}`}>
+                <td className="px-4 py-2 font-medium"><Resaltar texto={u.nombre} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={u.usuario} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2 text-gray-600 dark:text-gray-300"><Resaltar texto={u.email || "—"} termino={filtros.busquedaAplicada} /></td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${u.rol === "ADMIN" ? "bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200" : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"}`}>
+                  <span className={`px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider font-semibold ${u.rol === "ADMIN" ? "bg-slate-200 dark:bg-brand-700 text-gray-800 dark:text-gray-200" : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"}`}>
                     {u.rol === "ADMIN" ? "Administrador" : "Acceso personalizado"}
                   </span>
                 </td>
@@ -843,14 +881,14 @@ export function UsuariosPage() {
                   {u.sucursal?.nombre ?? <span className="text-amber-600 dark:text-amber-400">Sin asignar</span>}
                 </td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${u.activo ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}>
+                  <span className={`px-2 py-0.5 rounded-sm font-mono text-[10px] uppercase tracking-wider font-semibold ${u.activo ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-stone-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"}`}>
                     {u.activo ? "Activo" : "Inactivo"}
                   </span>
                 </td>
                 <td className="px-4 py-2 text-right space-x-3">
                   <button
                     onClick={() => abrirEdicion(u)}
-                    className="text-sky-600 dark:text-sky-400 hover:underline text-xs font-medium"
+                    className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-semibold"
                   >
                     Editar
                   </button>
@@ -875,6 +913,7 @@ export function UsuariosPage() {
             ))}
           </tbody>
         </table>
+      </div>
         {respuesta && (
           <Paginacion
             page={respuesta.paginacion.page}
@@ -899,19 +938,19 @@ export function UsuariosPage() {
               required
               value={formEdicion.nombre}
               onChange={(e) => setFormEdicion({ ...formEdicion, nombre: e.target.value })}
-              className="col-span-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="col-span-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
             <input
               placeholder="Correo (opcional, para recuperar la contraseña)"
               type="email"
               value={formEdicion.email}
               onChange={(e) => setFormEdicion({ ...formEdicion, email: e.target.value })}
-              className="col-span-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="col-span-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
             <select
               value={formEdicion.rol}
               onChange={(e) => setFormEdicion({ ...formEdicion, rol: e.target.value })}
-              className="col-span-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="col-span-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             >
               <option value="CAJERO">Personalizado (elige los permisos abajo)</option>
               <option value="ADMIN">Administrador (acceso total)</option>
@@ -920,7 +959,7 @@ export function UsuariosPage() {
               required
               value={formEdicion.sucursalId}
               onChange={(e) => setFormEdicion({ ...formEdicion, sucursalId: e.target.value })}
-              className="col-span-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="col-span-2 border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             >
               <option value="" disabled>Sucursal donde trabaja...</option>
               {sucursales?.map((s) => (
@@ -931,7 +970,7 @@ export function UsuariosPage() {
               <select
                 value={formEdicion.empleadoId}
                 onChange={(e) => setFormEdicion({ ...formEdicion, empleadoId: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               >
                 <option value="">Sin vincular a un empleado técnico</option>
                 {empleados?.map((e) => (
@@ -951,7 +990,7 @@ export function UsuariosPage() {
             <button
               type="submit"
               disabled={editarUsuario.isPending}
-              className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+              className="col-span-2 bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
             >
               {editarUsuario.isPending ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -970,12 +1009,12 @@ export function UsuariosPage() {
             Pásasela a {passwordTemporal.nombre} — el sistema le va a pedir cambiarla apenas entre. Esta es la
             única vez que se muestra, no queda guardada en ningún lado.
           </p>
-          <p className="font-mono text-lg text-center bg-gray-100 dark:bg-gray-900 rounded-md py-3 mb-3 select-all">
+          <p className="font-mono text-lg text-center bg-stone-100 dark:bg-gray-900 rounded-md py-3 mb-3 select-all">
             {passwordTemporal.password}
           </p>
           <button
             onClick={() => setPasswordTemporal(null)}
-            className="w-full bg-slate-800 dark:bg-slate-700 text-white py-2 rounded-md text-sm font-medium hover:bg-slate-700 dark:hover:bg-slate-600"
+            className="w-full bg-brand-700 dark:bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 dark:hover:bg-brand-800"
           >
             Ya la copié
           </button>

@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import { api, type ReporteAts } from "../api/client";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import { CLASE_CAMPO, CLASE_ETIQUETA, CLASE_THEAD, Resaltar } from "../components/FormatoDocumento";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -147,133 +149,300 @@ export function AtsPage() {
     XLSX.writeFile(libro, `ats_${anio}-${String(mes).padStart(2, "0")}.xlsx`);
   }
 
+  // Pestaña visible y buscador compartido de los listados (en el navegador:
+  // el reporte del mes ya viene completo). El buscador filtra la pestaña
+  // que se está viendo.
+  const [seccion, setSeccion] = useState<SeccionAts>("ventas");
+  const filtros = useFiltrosListado(sinPaginacion);
+  const termino = filtros.busquedaAplicada;
+  const R = (texto: string | null | undefined) => <Resaltar texto={texto ?? "—"} termino={termino} />;
+  const retenido = (detalles: { valorRetenido: string }[]) => detalles.reduce((a, d) => a + Number(d.valorRetenido), 0);
+  const codigos = (detalles: { tipoImpuesto: string; codigoRetencion: string; porcentaje: string }[]) =>
+    detalles.map((d) => `${d.tipoImpuesto} ${d.codigoRetencion} (${Number(d.porcentaje)}%)`).join(" · ");
+  const fecha = (valor: string) => <span className="font-mono text-xs">{new Date(valor).toLocaleDateString("es-EC")}</span>;
+  const dinero = (valor: string | number) => <span className="font-mono tabular-nums">{Number(valor).toFixed(2)}</span>;
+
+  const pestanas: { id: SeccionAts; etiqueta: string; cantidad: number }[] = reporteAts
+    ? [
+        { id: "ventas", etiqueta: "Ventas", cantidad: reporteAts.ventas.length },
+        { id: "notasCredito", etiqueta: "Notas de crédito", cantidad: reporteAts.notasCredito.length },
+        { id: "compras", etiqueta: "Compras", cantidad: reporteAts.compras.length },
+        { id: "retEmitidas", etiqueta: "Ret. emitidas", cantidad: reporteAts.retencionesEmitidas.length },
+        { id: "retRecibidas", etiqueta: "Ret. recibidas", cantidad: reporteAts.retencionesRecibidas.length },
+        { id: "anulados", etiqueta: "Anulados", cantidad: reporteAts.anulados.length },
+      ]
+    : [];
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Anexo Transaccional Simplificado (ATS)</h2>
-        <button
-          onClick={exportarExcelAts}
-          disabled={!reporteAts}
-          className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
-        >
-          Exportar Excel
-        </button>
-      </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 max-w-3xl">
-        Detalle por comprobante del mes elegido (ventas, compras, notas de crédito, retenciones emitidas/recibidas y
-        anulados) para revisar y cargar a mano en el DIMM Formularios — este sistema no genera el XML oficial que
-        exige el SRI, solo el insumo para armarlo. La columna "Sustento tributario" de Compras viene vacía solo en
-        compras registradas antes de que existiera ese campo; las nuevas ya lo piden al crearlas.
-      </p>
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-50">Anexo Transaccional Simplificado (ATS)</h2>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+              Período {String(mes).padStart(2, "0")}/{anio}
+            </span>
+            <button
+              onClick={exportarExcelAts}
+              disabled={!reporteAts}
+              className="bg-brand-700 text-white px-3 py-1.5 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-40"
+            >
+              Exportar Excel
+            </button>
+          </div>
+        </div>
+        <div className="px-4 py-2 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+          Detalle por comprobante del mes elegido para revisar y cargar a mano en el DIMM Formularios — este sistema no genera el XML
+          oficial que exige el SRI, solo el insumo para armarlo. La columna "Sustento tributario" de Compras viene vacía solo en compras
+          registradas antes de que existiera ese campo; las nuevas ya lo piden al crearlas.
+        </div>
+        <div className="px-4 py-2 bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-400">
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.15em] font-semibold">Códigos del SRI: verificar que sigan vigentes · </span>
+          Los códigos de tipo de identificación, forma de pago y porcentaje de IVA están tomados de la Ficha Técnica del SRI vigente al
+          programarlos, y el SRI los actualiza periódicamente. Si cambiaron, se corrigen desde <strong>Ajustes → Códigos SRI</strong>, sin
+          tocar código.
+        </div>
 
-      <div className="border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 rounded-md p-3 mb-4 max-w-3xl">
-        <p className="text-sm font-semibold text-red-700 dark:text-red-400">⚠ Códigos del SRI: verificar que sigan vigentes</p>
-        <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-          Los códigos de tipo de identificación, forma de pago (efectivo/tarjeta/transferencia) y porcentaje de IVA
-          que usa el XML de cada comprobante están tomados de la Ficha Técnica del SRI vigente al momento en que se
-          programaron — el SRI los actualiza periódicamente. Verificalos de tanto en tanto contra la ficha técnica
-          oficial más reciente; si cambiaron, se corrigen desde <strong>Ajustes → Códigos SRI</strong>, sin tocar
-          código ni volver a desplegar.
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2 mb-4">
-        <label className="text-xs text-gray-500 dark:text-gray-400">Período</label>
-        <select
-          value={mes}
-          onChange={(e) => setMes(Number(e.target.value))}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
-        >
-          {MESES.map((nombre, i) => (
-            <option key={nombre} value={i + 1}>
-              {nombre}
-            </option>
-          ))}
-        </select>
-        <input
-          type="number"
-          value={anio}
-          onChange={(e) => setAnio(Number(e.target.value))}
-          className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar en la pestaña · comprobante, identificación, razón social o clave de acceso"
+          placeholder="Ej: 001-001-000000125, 0190345678001, Tornillo..."
+          mostrarPago={false}
+          mostrarFechas={false}
+          autoFocus
+          extras={
+            <>
+              <label className="flex flex-col gap-1 w-36">
+                <span className={CLASE_ETIQUETA}>Mes</span>
+                <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className={CLASE_CAMPO}>
+                  {MESES.map((nombre, i) => (
+                    <option key={nombre} value={i + 1}>
+                      {nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 w-24">
+                <span className={CLASE_ETIQUETA}>Año</span>
+                <input type="number" value={anio} onChange={(e) => setAnio(Number(e.target.value))} className={`${CLASE_CAMPO} font-mono`} />
+              </label>
+            </>
+          }
         />
+
+        {/* Pestañas por sección del ATS, con su conteo */}
+        <div className="flex flex-wrap border-b border-stone-300 dark:border-gray-700 px-2">
+          {pestanas.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setSeccion(p.id)}
+              className={`px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px ${
+                seccion === p.id
+                  ? "border-brand-600 text-brand-700 dark:text-brand-300"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              }`}
+            >
+              {p.etiqueta}
+              <span className="ml-1.5 font-mono text-[10px] text-gray-400 dark:text-gray-500">{p.cantidad}</span>
+            </button>
+          ))}
+        </div>
+
+        {!reporteAts && <p className="px-4 py-6 text-sm text-gray-400 dark:text-gray-500">Cargando...</p>}
+
+        {reporteAts && seccion === "ventas" && (
+          <TablaAts
+            filas={filtrarLocal(reporteAts.ventas, filtros, { textos: (v) => [v.comprobante, v.identificacion, v.razonSocial, v.claveAcceso] }) ?? []}
+            clave={(v) => `${v.tipo}-${v.comprobante}`}
+            total={(v) => Number(v.total)}
+            vacio="Sin ventas en este período"
+            hayFiltros={filtros.hayFiltros}
+            columnas={[
+              { titulo: "Tipo", celda: (v) => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-500">{v.tipo === "FACTURA" ? "Factura" : "Nota de venta"}</span> },
+              { titulo: "Comprobante", celda: (v) => <span className="font-mono text-xs">{R(v.comprobante)}</span> },
+              { titulo: "Fecha", celda: (v) => fecha(v.fecha) },
+              { titulo: "Identificación", celda: (v) => <span className="font-mono text-xs">{R(v.identificacion)}</span> },
+              { titulo: "Razón social", celda: (v) => R(v.razonSocial) },
+              { titulo: "Base 0%", derecha: true, celda: (v) => dinero(v.base0) },
+              { titulo: "Base gravada", derecha: true, celda: (v) => dinero(v.base12) },
+              { titulo: "IVA", derecha: true, celda: (v) => dinero(v.iva) },
+              { titulo: "Total", derecha: true, celda: (v) => <strong>{dinero(v.total)}</strong> },
+            ]}
+          />
+        )}
+        {reporteAts && seccion === "notasCredito" && (
+          <TablaAts
+            filas={filtrarLocal(reporteAts.notasCredito, filtros, { textos: (n) => [n.comprobante, n.facturaModificada, n.identificacion, n.razonSocial, n.claveAcceso] }) ?? []}
+            clave={(n) => n.comprobante}
+            total={(n) => Number(n.total)}
+            vacio="Sin notas de crédito en este período"
+            hayFiltros={filtros.hayFiltros}
+            columnas={[
+              { titulo: "Comprobante", celda: (n) => <span className="font-mono text-xs">{R(n.comprobante)}</span> },
+              { titulo: "Fecha", celda: (n) => fecha(n.fecha) },
+              { titulo: "Factura modificada", celda: (n) => <span className="font-mono text-xs">{R(n.facturaModificada)}</span> },
+              { titulo: "Identificación", celda: (n) => <span className="font-mono text-xs">{R(n.identificacion)}</span> },
+              { titulo: "Razón social", celda: (n) => R(n.razonSocial) },
+              { titulo: "Base 0%", derecha: true, celda: (n) => dinero(n.base0) },
+              { titulo: "Base gravada", derecha: true, celda: (n) => dinero(n.base12) },
+              { titulo: "IVA", derecha: true, celda: (n) => dinero(n.iva) },
+              { titulo: "Total", derecha: true, celda: (n) => <strong>{dinero(n.total)}</strong> },
+            ]}
+          />
+        )}
+        {reporteAts && seccion === "compras" && (
+          <TablaAts
+            filas={filtrarLocal(reporteAts.compras, filtros, { textos: (c) => [c.comprobante, c.identificacion, c.razonSocial, c.sustentoTributario] }) ?? []}
+            clave={(c) => `${c.comprobante}-${c.identificacion}`}
+            total={(c) => Number(c.total)}
+            vacio="Sin compras en este período"
+            hayFiltros={filtros.hayFiltros}
+            columnas={[
+              { titulo: "Comprobante", celda: (c) => <span className="font-mono text-xs">{R(c.comprobante)}</span> },
+              { titulo: "Fecha", celda: (c) => fecha(c.fecha) },
+              { titulo: "Identificación", celda: (c) => <span className="font-mono text-xs">{R(c.identificacion)}</span> },
+              { titulo: "Razón social", celda: (c) => R(c.razonSocial) },
+              { titulo: "Base 0%", derecha: true, celda: (c) => dinero(c.base0) },
+              { titulo: "Base gravada", derecha: true, celda: (c) => dinero(c.base12) },
+              { titulo: "IVA", derecha: true, celda: (c) => dinero(c.iva) },
+              { titulo: "Total", derecha: true, celda: (c) => <strong>{dinero(c.total)}</strong> },
+              {
+                titulo: "Sustento",
+                celda: (c) =>
+                  c.sustentoTributario ? (
+                    <span className="font-mono text-xs">{R(c.sustentoTributario)}</span>
+                  ) : (
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400">Completar</span>
+                  ),
+              },
+            ]}
+          />
+        )}
+        {reporteAts && seccion === "retEmitidas" && (
+          <TablaAts
+            filas={filtrarLocal(reporteAts.retencionesEmitidas, filtros, { textos: (r) => [r.comprobante, r.compraNumeroFactura, r.identificacion, r.razonSocial, r.claveAcceso] }) ?? []}
+            clave={(r) => r.comprobante}
+            total={(r) => retenido(r.detalles)}
+            etiquetaTotal="TOTAL RETENIDO USD"
+            vacio="Sin retenciones emitidas en este período"
+            hayFiltros={filtros.hayFiltros}
+            columnas={[
+              { titulo: "Comprobante", celda: (r) => <span className="font-mono text-xs">{R(r.comprobante)}</span> },
+              { titulo: "Fecha", celda: (r) => fecha(r.fecha) },
+              { titulo: "Compra fact.", celda: (r) => <span className="font-mono text-xs">{R(r.compraNumeroFactura)}</span> },
+              { titulo: "Identificación", celda: (r) => <span className="font-mono text-xs">{R(r.identificacion)}</span> },
+              { titulo: "Razón social", celda: (r) => R(r.razonSocial) },
+              { titulo: "Retenciones", celda: (r) => <span className="font-mono text-[11px] text-gray-500">{codigos(r.detalles)}</span> },
+              { titulo: "Valor retenido", derecha: true, celda: (r) => <strong>{dinero(retenido(r.detalles))}</strong> },
+            ]}
+          />
+        )}
+        {reporteAts && seccion === "retRecibidas" && (
+          <TablaAts
+            filas={filtrarLocal(reporteAts.retencionesRecibidas, filtros, { textos: (r) => [r.comprobante, r.facturaSecuencial, r.identificacion, r.razonSocial] }) ?? []}
+            clave={(r) => `${r.comprobante}-${r.facturaSecuencial}`}
+            total={(r) => retenido(r.detalles)}
+            etiquetaTotal="TOTAL RETENIDO USD"
+            vacio="Sin retenciones recibidas en este período"
+            hayFiltros={filtros.hayFiltros}
+            columnas={[
+              { titulo: "Comprobante", celda: (r) => <span className="font-mono text-xs">{R(r.comprobante)}</span> },
+              { titulo: "Fecha", celda: (r) => fecha(r.fecha) },
+              { titulo: "Factura", celda: (r) => <span className="font-mono text-xs">{R(r.facturaSecuencial)}</span> },
+              { titulo: "Identificación", celda: (r) => <span className="font-mono text-xs">{R(r.identificacion)}</span> },
+              { titulo: "Razón social", celda: (r) => R(r.razonSocial) },
+              { titulo: "Retenciones", celda: (r) => <span className="font-mono text-[11px] text-gray-500">{codigos(r.detalles)}</span> },
+              { titulo: "Valor retenido", derecha: true, celda: (r) => <strong>{dinero(retenido(r.detalles))}</strong> },
+            ]}
+          />
+        )}
+        {reporteAts && seccion === "anulados" && (
+          <TablaAts
+            filas={filtrarLocal(reporteAts.anulados, filtros, { textos: (x) => [x.comprobante, x.claveAcceso] }) ?? []}
+            clave={(x) => `${x.tipo}-${x.comprobante}`}
+            vacio="Sin comprobantes anulados en este período"
+            hayFiltros={filtros.hayFiltros}
+            columnas={[
+              { titulo: "Tipo", celda: (x) => <span className="font-mono text-[10px] uppercase tracking-wider text-gray-500">{x.tipo === "FACTURA" ? "Factura" : "Nota de crédito"}</span> },
+              { titulo: "Comprobante", celda: (x) => <span className="font-mono text-xs">{R(x.comprobante)}</span> },
+              { titulo: "Fecha", celda: (x) => fecha(x.fecha) },
+              { titulo: "Clave de acceso", celda: (x) => <span className="font-mono text-[11px] text-gray-500 break-all">{R(x.claveAcceso)}</span> },
+            ]}
+          />
+        )}
       </div>
-
-      {reporteAts && (
-        <>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-4">
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3">
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">Ventas</p>
-              <p className="text-lg font-bold text-gray-800 dark:text-gray-100">{reporteAts.resumen.cantidadVentas}</p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500">${reporteAts.resumen.totalVentas}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3">
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">Notas de crédito</p>
-              <p className="text-lg font-bold text-gray-800 dark:text-gray-100">{reporteAts.resumen.cantidadNotasCredito}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3">
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">Compras</p>
-              <p className="text-lg font-bold text-gray-800 dark:text-gray-100">{reporteAts.resumen.cantidadCompras}</p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500">${reporteAts.resumen.totalCompras}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3">
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">Ret. emitidas</p>
-              <p className="text-lg font-bold text-gray-800 dark:text-gray-100">{reporteAts.resumen.cantidadRetencionesEmitidas}</p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500">${reporteAts.resumen.totalRetencionesEmitidas}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-3">
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">Ret. recibidas</p>
-              <p className="text-lg font-bold text-gray-800 dark:text-gray-100">{reporteAts.resumen.cantidadRetencionesRecibidas}</p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500">${reporteAts.resumen.totalRetencionesRecibidas}</p>
-            </div>
-            <div className="bg-amber-600 rounded-lg shadow-sm p-3">
-              <p className="text-[11px] text-amber-100">Anulados</p>
-              <p className="text-lg font-bold text-white">{reporteAts.resumen.cantidadAnulados}</p>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
-                <tr>
-                  <th className="px-4 py-2">Tipo</th>
-                  <th className="px-4 py-2">Comprobante</th>
-                  <th className="px-4 py-2">Fecha</th>
-                  <th className="px-4 py-2">Identificación</th>
-                  <th className="px-4 py-2">Razón social</th>
-                  <th className="px-4 py-2 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reporteAts.ventas.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                      Sin ventas en este período
-                    </td>
-                  </tr>
-                )}
-                {reporteAts.ventas.map((v) => (
-                  <tr key={`${v.tipo}-${v.comprobante}`} className="border-t border-gray-100 dark:border-gray-700">
-                    <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
-                      {v.tipo === "FACTURA" ? "Factura" : "Nota de venta"}
-                    </td>
-                    <td className="px-4 py-2 font-mono text-xs">{v.comprobante}</td>
-                    <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
-                      {new Date(v.fecha).toLocaleDateString("es-EC")}
-                    </td>
-                    <td className="px-4 py-2 text-xs">{v.identificacion}</td>
-                    <td className="px-4 py-2">{v.razonSocial}</td>
-                    <td className="px-4 py-2 text-right font-semibold">${v.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2">
-            Solo se muestran las ventas en pantalla — compras, notas de crédito, retenciones (con su detalle de
-            IVA/Renta) y anulados vienen completos en el Excel.
-          </p>
-        </>
-      )}
     </div>
+  );
+}
+
+type SeccionAts = "ventas" | "notasCredito" | "compras" | "retEmitidas" | "retRecibidas" | "anulados";
+
+// Tabla de una sección del ATS: encabezado del formato, filas y pie con el
+// total de lo filtrado (como el de Facturas emitidas).
+function TablaAts<T>({
+  filas,
+  columnas,
+  clave,
+  total,
+  etiquetaTotal = "TOTAL USD",
+  vacio,
+  hayFiltros,
+}: {
+  filas: T[];
+  columnas: { titulo: string; derecha?: boolean; celda: (fila: T) => ReactNode }[];
+  clave: (fila: T) => string;
+  total?: (fila: T) => number;
+  etiquetaTotal?: string;
+  vacio: string;
+  hayFiltros: boolean;
+}) {
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className={CLASE_THEAD}>
+            <tr>
+              {columnas.map((c) => (
+                <th key={c.titulo} className={`px-4 py-2 whitespace-nowrap ${c.derecha ? "text-right" : ""}`}>
+                  {c.titulo}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filas.length === 0 && (
+              <tr>
+                <td colSpan={columnas.length} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                  {hayFiltros ? "Ningún comprobante coincide con la búsqueda." : vacio}
+                </td>
+              </tr>
+            )}
+            {filas.map((fila) => (
+              <tr key={clave(fila)} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
+                {columnas.map((c) => (
+                  <td key={c.titulo} className={`px-4 py-2 ${c.derecha ? "text-right whitespace-nowrap" : ""}`}>
+                    {c.celda(fila)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {filas.length > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 py-2.5 border-t-2 border-gray-900 dark:border-gray-200">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            {filas.length} comprobante{filas.length === 1 ? "" : "s"}
+            {hayFiltros ? " · según filtro" : ""}
+          </span>
+          {total && (
+            <span className="text-sm font-bold text-gray-900 dark:text-gray-50">
+              {etiquetaTotal}{" "}
+              <span className="font-mono tabular-nums ml-2">{filas.reduce((a, f) => a + total(f), 0).toFixed(2)}</span>
+            </span>
+          )}
+        </div>
+      )}
+    </>
   );
 }

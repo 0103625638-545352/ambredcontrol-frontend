@@ -4,6 +4,18 @@ import { api, type PlanInternet } from "../api/client";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
 import { formatearVelocidadMikrotik } from "./MikrotikPage";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import {
+  CLASE_CAMPO,
+  CLASE_ETIQUETA,
+  CLASE_THEAD,
+  CLASE_CAMPO_CELDA,
+  CLASE_ACCION,
+  CLASE_ACCION_PELIGRO,
+  PanelListado,
+  FilaSinResultados,
+  Resaltar,
+} from "../components/FormatoDocumento";
 
 // Catálogo de planes de internet (nombre + velocidad + precio + código de
 // Mikrotik) que un Cliente del ISP puede contratar (ver
@@ -70,182 +82,214 @@ export function PlanesInternetPage() {
     if (ok) desactivar.mutate(p.id);
   }
 
+  // Buscador del catálogo (en el navegador: la lista ya viene completa).
+  const filtros = useFiltrosListado(sinPaginacion);
+  const planesFiltrados = filtrarLocal(planes, filtros, {
+    textos: (p) => [p.nombre, p.codigoMikrotik, p.velocidadSubida, p.velocidadBajada, p.precio],
+  });
+
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Planes de Internet</h2>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-        Catálogo de planes contratables por los clientes del ISP. El "código Mikrotik" debe ser el nombre exacto de la address-list en el router (ej. "PLAN550", ya con su Queue de velocidad configurado ahí) — al asignar el plan desde Clientes, el sistema agrega la IP del cliente a esa lista.
-      </p>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (formNuevo.nombre.trim() && formNuevo.velocidadSubida.trim() && formNuevo.velocidadBajada.trim() && formNuevo.precio !== "") {
-            crear.mutate();
-          }
-        }}
-        className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 flex flex-wrap gap-3 max-w-3xl"
-      >
-        <input
-          placeholder="Nombre del plan (ej. Plan Hogar 10 Mbps)"
-          required
-          value={formNuevo.nombre}
-          onChange={(e) => setFormNuevo({ ...formNuevo, nombre: e.target.value })}
-          className="flex-1 min-w-[200px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <input
-          placeholder="Subida (ej. 5M)"
-          required
-          value={formNuevo.velocidadSubida}
-          onChange={(e) => setFormNuevo({ ...formNuevo, velocidadSubida: e.target.value })}
-          className="w-28 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <input
-          placeholder="Bajada (ej. 10M)"
-          required
-          value={formNuevo.velocidadBajada}
-          onChange={(e) => setFormNuevo({ ...formNuevo, velocidadBajada: e.target.value })}
-          className="w-28 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="Precio mensual"
-          required
-          value={formNuevo.precio}
-          onChange={(e) => setFormNuevo({ ...formNuevo, precio: e.target.value })}
-          className="w-32 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <input
-          placeholder="Código Mikrotik (ej. PLAN550)"
-          value={formNuevo.codigoMikrotik}
-          onChange={(e) => setFormNuevo({ ...formNuevo, codigoMikrotik: e.target.value })}
-          className="w-44 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={crear.isPending}
-          className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50 whitespace-nowrap"
+    <div className="max-w-5xl">
+      <PanelListado titulo="Planes de internet" conteo={planes?.length} singular="plan" plural="planes" aviso={<>Catálogo de planes contratables por los clientes del ISP. El "código Mikrotik" debe ser el nombre exacto de la address-list en el router (ej. "PLAN550", ya con su Queue de velocidad configurado ahí) — al asignar el plan desde Clientes, el sistema agrega la IP del cliente a esa lista.</>}>
+        {/* Línea de ingreso: nuevo plan */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (formNuevo.nombre.trim() && formNuevo.velocidadSubida.trim() && formNuevo.velocidadBajada.trim() && formNuevo.precio !== "") {
+              crear.mutate();
+            }
+          }}
+          className="flex flex-wrap items-end gap-2 p-3 border-b border-stone-300 dark:border-gray-700"
         >
-          {crear.isPending ? "Guardando..." : "+ Agregar"}
-        </button>
-      </form>
+          <label className="flex flex-col gap-1 flex-[2_1_220px] min-w-0">
+            <span className={CLASE_ETIQUETA}>Nuevo plan</span>
+            <input
+              placeholder="Ej: Plan Hogar 10 Mbps"
+              required
+              value={formNuevo.nombre}
+              onChange={(e) => setFormNuevo({ ...formNuevo, nombre: e.target.value })}
+              className={CLASE_CAMPO}
+            />
+          </label>
+          <label className="flex flex-col gap-1 w-24">
+            <span className={CLASE_ETIQUETA}>Subida</span>
+            <input
+              placeholder="5M"
+              required
+              value={formNuevo.velocidadSubida}
+              onChange={(e) => setFormNuevo({ ...formNuevo, velocidadSubida: e.target.value })}
+              className={`${CLASE_CAMPO} font-mono`}
+            />
+          </label>
+          <label className="flex flex-col gap-1 w-24">
+            <span className={CLASE_ETIQUETA}>Bajada</span>
+            <input
+              placeholder="10M"
+              required
+              value={formNuevo.velocidadBajada}
+              onChange={(e) => setFormNuevo({ ...formNuevo, velocidadBajada: e.target.value })}
+              className={`${CLASE_CAMPO} font-mono`}
+            />
+          </label>
+          <label className="flex flex-col gap-1 w-28">
+            <span className={CLASE_ETIQUETA}>Precio mensual</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              required
+              value={formNuevo.precio}
+              onChange={(e) => setFormNuevo({ ...formNuevo, precio: e.target.value })}
+              className={`${CLASE_CAMPO} text-right font-mono`}
+            />
+          </label>
+          <label className="flex flex-col gap-1 w-40">
+            <span className={CLASE_ETIQUETA}>Código Mikrotik</span>
+            <input
+              placeholder="PLAN550"
+              value={formNuevo.codigoMikrotik}
+              onChange={(e) => setFormNuevo({ ...formNuevo, codigoMikrotik: e.target.value })}
+              className={`${CLASE_CAMPO} font-mono`}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={crear.isPending}
+            className="bg-brand-700 text-white px-4 py-1.5 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-50 whitespace-nowrap"
+          >
+            {crear.isPending ? "Guardando..." : "Agregar ↵"}
+          </button>
+        </form>
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden max-w-3xl">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
-            <tr>
-              <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2">Subida</th>
-              <th className="px-4 py-2">Bajada</th>
-              <th className="px-4 py-2">Precio</th>
-              <th className="px-4 py-2">Código Mikrotik</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · nombre, velocidad, precio o código Mikrotik"
+          placeholder="Ej: Hogar, 10M, PLAN550..."
+          mostrarPago={false}
+          mostrarFechas={false}
+        />
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className={CLASE_THEAD}>
               <tr>
-                <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
+                <th className="px-4 py-2 w-10">#</th>
+                <th className="px-4 py-2">Nombre</th>
+                <th className="px-4 py-2">Subida</th>
+                <th className="px-4 py-2">Bajada</th>
+                <th className="px-4 py-2 text-right">Precio / mes</th>
+                <th className="px-4 py-2">Código Mikrotik</th>
+                <th className="px-4 py-2 w-40"></th>
               </tr>
-            )}
-            {!isLoading && planes?.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Todavía no hay planes de internet</td>
-              </tr>
-            )}
-            {planes?.map((p) => (
-              <tr key={p.id} className="border-t border-gray-100 dark:border-gray-700">
-                {planEditandoId === p.id ? (
-                  <td colSpan={6} className="px-4 py-2">
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        editar.mutate(p.id);
-                      }}
-                      className="flex flex-wrap gap-2"
-                    >
-                      <input
-                        autoFocus
-                        required
-                        value={editForm.nombre}
-                        onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
-                        className="flex-1 min-w-[160px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <input
-                        required
-                        value={editForm.velocidadSubida}
-                        onChange={(e) => setEditForm({ ...editForm, velocidadSubida: e.target.value })}
-                        className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <input
-                        required
-                        value={editForm.velocidadBajada}
-                        onChange={(e) => setEditForm({ ...editForm, velocidadBajada: e.target.value })}
-                        className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        required
-                        value={editForm.precio}
-                        onChange={(e) => setEditForm({ ...editForm, precio: e.target.value })}
-                        className="w-28 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <input
-                        placeholder="Código Mikrotik"
-                        value={editForm.codigoMikrotik}
-                        onChange={(e) => setEditForm({ ...editForm, codigoMikrotik: e.target.value })}
-                        className="w-36 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <button
-                        type="submit"
-                        disabled={editar.isPending}
-                        className="bg-slate-800 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-slate-700 disabled:opacity-50"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPlanEditandoId(null)}
-                        className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
-                      >
-                        Cancelar
-                      </button>
-                    </form>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-gray-400 dark:text-gray-500">
+                    Cargando...
                   </td>
-                ) : (
-                  <>
-                    <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">{p.nombre}</td>
-                    <td className="px-4 py-2">{formatearVelocidadMikrotik(velocidadAbits(p.velocidadSubida))}</td>
-                    <td className="px-4 py-2">{formatearVelocidadMikrotik(velocidadAbits(p.velocidadBajada))}</td>
-                    <td className="px-4 py-2">${Number(p.precio).toFixed(2)}</td>
-                    <td className="px-4 py-2">
-                      {p.codigoMikrotik ?? <span className="text-amber-600 dark:text-amber-400 text-xs italic">sin configurar</span>}
-                    </td>
-                    <td className="px-4 py-2 text-right space-x-3">
-                      <button
-                        onClick={() => abrirEdicion(p)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                </tr>
+              )}
+              {!isLoading && planesFiltrados?.length === 0 && (
+                <FilaSinResultados columnas={7} hayFiltros={filtros.hayFiltros} vacio="Todavía no hay planes de internet." />
+              )}
+              {planesFiltrados?.map((p, indice) => (
+                <tr key={p.id} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
+                  {planEditandoId === p.id ? (
+                    <td colSpan={7} className="px-4 py-2">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          editar.mutate(p.id);
+                        }}
+                        className="flex flex-wrap gap-2"
                       >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => confirmarDesactivar(p)}
-                        className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium"
-                      >
-                        Desactivar
-                      </button>
+                        <input
+                          autoFocus
+                          required
+                          value={editForm.nombre}
+                          onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setPlanEditandoId(null);
+                          }}
+                          className={`${CLASE_CAMPO_CELDA} flex-1 min-w-40 text-left font-sans`}
+                        />
+                        <input
+                          required
+                          value={editForm.velocidadSubida}
+                          onChange={(e) => setEditForm({ ...editForm, velocidadSubida: e.target.value })}
+                          className={`${CLASE_CAMPO_CELDA} w-20 text-left`}
+                        />
+                        <input
+                          required
+                          value={editForm.velocidadBajada}
+                          onChange={(e) => setEditForm({ ...editForm, velocidadBajada: e.target.value })}
+                          className={`${CLASE_CAMPO_CELDA} w-20 text-left`}
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          required
+                          value={editForm.precio}
+                          onChange={(e) => setEditForm({ ...editForm, precio: e.target.value })}
+                          className={`${CLASE_CAMPO_CELDA} w-24`}
+                        />
+                        <input
+                          placeholder="Código Mikrotik"
+                          value={editForm.codigoMikrotik}
+                          onChange={(e) => setEditForm({ ...editForm, codigoMikrotik: e.target.value })}
+                          className={`${CLASE_CAMPO_CELDA} w-32 text-left`}
+                        />
+                        <button
+                          type="submit"
+                          disabled={editar.isPending}
+                          className="bg-brand-700 text-white px-3 py-1 rounded-sm text-xs font-semibold hover:bg-brand-800 disabled:opacity-50"
+                        >
+                          Guardar
+                        </button>
+                        <button type="button" onClick={() => setPlanEditandoId(null)} className={CLASE_ACCION}>
+                          Cancelar
+                        </button>
+                      </form>
                     </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  ) : (
+                    <>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-400">{indice + 1}</td>
+                      <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">
+                        <Resaltar texto={p.nombre} termino={filtros.busquedaAplicada} />
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs">{formatearVelocidadMikrotik(velocidadAbits(p.velocidadSubida))}</td>
+                      <td className="px-4 py-2 font-mono text-xs">{formatearVelocidadMikrotik(velocidadAbits(p.velocidadBajada))}</td>
+                      <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-gray-900 dark:text-gray-50">
+                        {Number(p.precio).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {p.codigoMikrotik ? (
+                          <Resaltar texto={p.codigoMikrotik} termino={filtros.busquedaAplicada} />
+                        ) : (
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400">Sin configurar</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex justify-end gap-3">
+                          <button onClick={() => abrirEdicion(p)} className={CLASE_ACCION}>
+                            Editar
+                          </button>
+                          <button onClick={() => confirmarDesactivar(p)} className={CLASE_ACCION_PELIGRO}>
+                            Desactivar
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </PanelListado>
     </div>
   );
 }

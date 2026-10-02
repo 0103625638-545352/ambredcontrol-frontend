@@ -48,7 +48,7 @@ export function DetalleDocumentoModal<T>({ endpoint, id, titulo, campos, obtener
           </div>
 
           {obtenerLineas(doc).length > 0 && (
-            <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
+            <div className="border-t border-stone-100 dark:border-gray-700 pt-3">
               <table className="w-full text-sm">
                 <thead className="text-left text-gray-500 dark:text-gray-400">
                   <tr>

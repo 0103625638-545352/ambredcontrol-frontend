@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import { api, type Empleado, type VisitaHistorialTecnico, type VisitaHistorialCliente } from "../api/client";
 import { BuscadorCliente } from "../components/BuscadorCliente";
 import { TarjetaVisitaDetalle } from "../components/TarjetaVisitaDetalle";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import { CLASE_CAMPO, CLASE_ETIQUETA } from "../components/FormatoDocumento";
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   PENDIENTE: "Pendiente",
@@ -31,8 +33,10 @@ function ResumenConteo({ visitas }: { visitas: { estado: string }[] }) {
 // que solo filtra por un día exacto.
 function SeccionPorTecnico() {
   const [empleadoId, setEmpleadoId] = useState("");
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
+  // Buscador compartido: Desde/Hasta van al servidor (como antes); el texto
+  // y el estado filtran en el navegador lo que ya llegó.
+  const filtros = useFiltrosListado(sinPaginacion);
+  const { desde, hasta } = filtros;
 
   const { data: empleados } = useQuery({
     queryKey: ["empleados-activos"],
@@ -48,6 +52,17 @@ function SeccionPorTecnico() {
         })
       ).data,
     enabled: !!empleadoId,
+  });
+  const visitasFiltradas = filtrarLocal(visitas, filtros, {
+    textos: (v) => [
+      v.cliente?.razonSocial,
+      v.cliente?.identificacion,
+      v.nombreContacto,
+      v.direccion,
+      v.descripcionTrabajo,
+      ...v.equiposDejados.flatMap((eq) => [eq.tipo, eq.modelo, eq.serial]),
+    ],
+    estado: (v) => v.estado,
   });
 
   function exportarExcel() {
@@ -81,51 +96,53 @@ function SeccionPorTecnico() {
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <select
-          value={empleadoId}
-          onChange={(e) => setEmpleadoId(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        >
-          <option value="">Técnico...</option>
-          {empleados?.map((e) => (
-            <option key={e.id} value={e.id}>{e.nombres} {e.apellidos}</option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={desde}
-          onChange={(e) => setDesde(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          title="Desde (opcional)"
-        />
-        <input
-          type="date"
-          value={hasta}
-          onChange={(e) => setHasta(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          title="Hasta (opcional)"
+      <div className="-mx-4 mb-4 border-t border-stone-300 dark:border-gray-700">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar en el historial · cliente, contacto, dirección, trabajo o serial"
+          placeholder="Ej: Pérez, fibra rota, 48575443..."
+          opcionesEstado={[
+            { valor: "COMPLETADA", etiqueta: "Completada" },
+            { valor: "PENDIENTE", etiqueta: "Pendiente" },
+            { valor: "OMITIDA", etiqueta: "Omitida" },
+          ]}
+          mostrarPago={false}
+          extras={
+            <label className="flex flex-col gap-1 w-48">
+              <span className={CLASE_ETIQUETA}>Técnico</span>
+              <select value={empleadoId} onChange={(e) => setEmpleadoId(e.target.value)} className={CLASE_CAMPO}>
+                <option value="">Elegir técnico...</option>
+                {empleados?.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombres} {e.apellidos}
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
         />
       </div>
 
       {!empleadoId && <p className="text-sm text-gray-400 dark:text-gray-500">Elige un técnico para ver su historial.</p>}
       {empleadoId && isFetching && <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>}
-      {empleadoId && !isFetching && visitas?.length === 0 && (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Sin visitas en ese rango.</p>
+      {empleadoId && !isFetching && visitasFiltradas?.length === 0 && (
+        <p className="text-sm text-gray-400 dark:text-gray-500">
+          {visitas?.length ? "Ninguna visita coincide con la búsqueda." : "Sin visitas en ese rango."}
+        </p>
       )}
-      {empleadoId && visitas && visitas.length > 0 && (
+      {empleadoId && visitasFiltradas && visitasFiltradas.length > 0 && (
         <>
           <div className="flex justify-between items-center">
-            <ResumenConteo visitas={visitas} />
+            <ResumenConteo visitas={visitasFiltradas} />
             <button
               onClick={exportarExcel}
-              className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 mb-3 h-fit"
+              className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800 mb-3 h-fit"
             >
               Exportar a Excel
             </button>
           </div>
           <div className="space-y-3">
-            {visitas.map((v) => (
+            {visitasFiltradas.map((v) => (
               <TarjetaVisitaDetalle
                 key={v.id}
                 visita={v}
@@ -151,11 +168,25 @@ function SeccionPorTecnico() {
 function SeccionPorCliente() {
   const [clienteId, setClienteId] = useState<number | "">("");
   const [nombreCliente, setNombreCliente] = useState("");
+  // Buscador sobre las visitas del cliente elegido (en el navegador).
+  const filtros = useFiltrosListado(sinPaginacion);
 
   const { data: visitas, isFetching } = useQuery({
     queryKey: ["historial-visitas-cliente", clienteId],
     queryFn: async () => (await api.get<VisitaHistorialCliente[]>(`/clientes/${clienteId}/historial-visitas`)).data,
     enabled: !!clienteId,
+  });
+  const visitasFiltradas = filtrarLocal(visitas, filtros, {
+    textos: (v) => [
+      v.rutaVisita.empleado.nombres,
+      v.rutaVisita.empleado.apellidos,
+      v.nombreContacto,
+      v.direccion,
+      v.descripcionTrabajo,
+      ...v.equiposDejados.flatMap((eq) => [eq.tipo, eq.modelo, eq.serial]),
+    ],
+    estado: (v) => v.estado,
+    fecha: (v) => v.rutaVisita.fecha,
   });
 
   function exportarExcel() {
@@ -196,25 +227,42 @@ function SeccionPorCliente() {
           }}
         />
       </div>
+      {clienteId && (
+        <div className="-mx-4 mb-4 border-t border-stone-300 dark:border-gray-700">
+          <BarraBuscadorDocumentos
+            filtros={filtros}
+            etiquetaBusqueda="Buscar en sus visitas · técnico, contacto, dirección, trabajo o serial"
+            placeholder="Ej: fibra rota, 48575443..."
+          opcionesEstado={[
+              { valor: "COMPLETADA", etiqueta: "Completada" },
+              { valor: "PENDIENTE", etiqueta: "Pendiente" },
+              { valor: "OMITIDA", etiqueta: "Omitida" },
+            ]}
+            mostrarPago={false}
+          />
+        </div>
+      )}
 
       {!clienteId && <p className="text-sm text-gray-400 dark:text-gray-500">Elige un cliente para ver cuántas visitas ha solicitado.</p>}
       {clienteId && isFetching && <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>}
-      {clienteId && !isFetching && visitas?.length === 0 && (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Este cliente todavía no ha recibido visitas técnicas.</p>
+      {clienteId && !isFetching && visitasFiltradas?.length === 0 && (
+        <p className="text-sm text-gray-400 dark:text-gray-500">
+          {visitas?.length ? "Ninguna visita coincide con la búsqueda." : "Este cliente todavía no ha recibido visitas técnicas."}
+        </p>
       )}
-      {clienteId && visitas && visitas.length > 0 && (
+      {clienteId && visitasFiltradas && visitasFiltradas.length > 0 && (
         <>
           <div className="flex justify-between items-center">
-            <ResumenConteo visitas={visitas} />
+            <ResumenConteo visitas={visitasFiltradas} />
             <button
               onClick={exportarExcel}
-              className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 mb-3 h-fit"
+              className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-brand-800 mb-3 h-fit"
             >
               Exportar a Excel
             </button>
           </div>
           <div className="space-y-3">
-            {visitas.map((v) => (
+            {visitasFiltradas.map((v) => (
               <TarjetaVisitaDetalle
                 key={v.id}
                 visita={v}
@@ -240,15 +288,15 @@ export function HistorialVisitasPage() {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Historial de Visitas Técnicas</h2>
+      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-4">Historial de Visitas Técnicas</h2>
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+        <div className="flex gap-4 border-b border-stone-300 dark:border-gray-700 mb-4">
           <button
             onClick={() => setPestana("tecnico")}
             className={`pb-2 text-sm font-medium border-b-2 -mb-px ${
               pestana === "tecnico"
-                ? "border-slate-700 dark:border-slate-300 text-slate-800 dark:text-slate-100"
+                ? "border-brand-700 dark:border-brand-400 text-gray-800 dark:text-gray-100"
                 : "border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             }`}
           >
@@ -258,7 +306,7 @@ export function HistorialVisitasPage() {
             onClick={() => setPestana("cliente")}
             className={`pb-2 text-sm font-medium border-b-2 -mb-px ${
               pestana === "cliente"
-                ? "border-slate-700 dark:border-slate-300 text-slate-800 dark:text-slate-100"
+                ? "border-brand-700 dark:border-brand-400 text-gray-800 dark:text-gray-100"
                 : "border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             }`}
           >

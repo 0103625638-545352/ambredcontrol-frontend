@@ -43,8 +43,8 @@ export function DiccionarioBuscador() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5 max-w-lg mt-4">
-      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">Diccionario del buscador</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-5 max-w-lg mt-4">
+      <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-1">Diccionario del buscador</h3>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
         Palabras adicionales que el "Buscador dinámico" de Reportes reconoce, más allá de las que ya trae de fábrica
         (ej. si alguien pregunta "sin señal" y quieres que cuente como "suspendidos"). No es inteligencia artificial
@@ -59,11 +59,11 @@ export function DiccionarioBuscador() {
         className="flex flex-wrap items-end gap-2 mb-4"
       >
         <div>
-          <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-1">Categoría</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Categoría</label>
           <select
             value={categoria}
             onChange={(e) => setCategoria(e.target.value as CategoriaSinonimo)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           >
             {CATEGORIAS_SINONIMO.map((c) => (
               <option key={c.valor} value={c.valor}>
@@ -73,19 +73,19 @@ export function DiccionarioBuscador() {
           </select>
         </div>
         <div className="flex-1 min-w-[160px]">
-          <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-1">Palabra o frase</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Palabra o frase</label>
           <input
             type="text"
             value={palabra}
             onChange={(e) => setPalabra(e.target.value)}
             placeholder="ej. sin señal"
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
         </div>
         <button
           type="submit"
           disabled={agregar.isPending || !palabra.trim()}
-          className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+          className="bg-brand-700 text-white px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
         >
           {agregar.isPending ? "Agregando..." : "Agregar"}
         </button>
@@ -109,7 +109,7 @@ export function DiccionarioBuscador() {
                   {palabras.map((s) => (
                     <span
                       key={s.id}
-                      className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs px-2 py-1 rounded-full"
+                      className="inline-flex items-center gap-1 bg-stone-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-sm"
                     >
                       {s.palabra}
                       <button

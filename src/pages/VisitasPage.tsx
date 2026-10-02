@@ -12,240 +12,32 @@ import {
 import { useAuth, usePermiso } from "../context/AuthContext";
 import { useToast } from "../components/ToastProvider";
 import { useDebounce } from "../hooks/useDebounce";
-import { useSincronizarAccionesPendientes } from "../hooks/useSincronizarAccionesPendientes";
-import { agregarAccionPendiente } from "../utils/colaOffline";
 import { BuscadorCliente } from "../components/BuscadorCliente";
 import { CampoPegarUbicacion } from "../components/CampoPegarUbicacion";
 import { MapaGeocerca } from "../components/MapaGeocerca";
-import { MapaRuta, type ParadaMapa } from "../components/MapaRuta";
 import { Paginacion } from "../components/Paginacion";
-import { DetalleTrabajoVisita } from "../components/DetalleTrabajoVisita";
 import { TarjetaVisitaDetalle } from "../components/TarjetaVisitaDetalle";
+import { SeccionMiRuta, ETIQUETA_ESTADO } from "../components/SeccionMiRuta";
+import { useFiltrosListado, BarraBuscadorDocumentos } from "../components/BuscadorDocumentos";
+import {
+  CLASE_CAMPO,
+  CLASE_ETIQUETA,
+  CLASE_TH,
+  MarcoDocumento,
+  Sello,
+  ConteoItems,
+  CabeceraDocumento,
+  EtiquetaCabecera,
+  DetalleDocumento,
+  FilaDetalleVacia,
+  BotonConfirmar,
+  Resaltar,
+} from "../components/FormatoDocumento";
 
-const ETIQUETA_ESTADO: Record<string, string> = {
-  PENDIENTE: "Pendiente",
-  COMPLETADA: "Completada",
-  OMITIDA: "Omitida",
-};
-
-const CLASE_ESTADO: Record<string, string> = {
-  PENDIENTE: "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300",
-  COMPLETADA: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
-  OMITIDA: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
-};
-
-// A diferencia de obtenerUbicacion() en FormularioMarcacion.tsx (donde no
-// tener GPS no bloquea marcar asistencia), acá la ubicación real de llegada
-// SÍ es obligatoria — es el dato que justifica todo el módulo (confirmar que
-// la visita ocurrió en el punto correcto). Si no se puede obtener, se avisa
-// y no se manda el PATCH.
-function obtenerUbicacionObligatoria(): Promise<{ latitud: number; longitud: number } | null> {
-  return new Promise((resolve) => {
-    if (!("geolocation" in navigator)) {
-      resolve(null);
-      return;
-    }
-    let resuelto = false;
-    const terminar = (valor: { latitud: number; longitud: number } | null) => {
-      if (resuelto) return;
-      resuelto = true;
-      resolve(valor);
-    };
-    const timeoutId = setTimeout(() => terminar(null), 10000);
-    navigator.geolocation.getCurrentPosition(
-      (posicion) => {
-        clearTimeout(timeoutId);
-        terminar({ latitud: posicion.coords.latitude, longitud: posicion.coords.longitude });
-      },
-      () => {
-        clearTimeout(timeoutId);
-        terminar(null);
-      },
-      { enableHighAccuracy: true, timeout: 9000 }
-    );
-  });
-}
-
-// "Mi ruta de hoy" — cualquier Usuario con empleadoId vinculado (ver select
-// en UsuariosPage.tsx) ve acá SOLO sus propias paradas del día, sin
-// necesitar el permiso "visitas" (ver backend/src/routes/visitas.ts).
-function SeccionMiRuta() {
-  const { mostrarToast } = useToast();
-  const queryClient = useQueryClient();
-  const [observaciones, setObservaciones] = useState<Record<number, string>>({});
-  const { pendientes, sincronizarAhora, refrescarPendientes } = useSincronizarAccionesPendientes();
-
-  const { data: ruta, isLoading } = useQuery({
-    queryKey: ["mi-ruta-hoy"],
-    queryFn: async () => (await api.get<RutaVisita | null>("/visitas/mi-ruta-hoy")).data,
-  });
-
-  const marcarLlegada = useMutation({
-    mutationFn: async (visitaId: number) => {
-      const ubicacion = await obtenerUbicacionObligatoria();
-      if (!ubicacion) {
-        throw new Error("No se pudo obtener tu ubicación. Activa el GPS y el permiso de ubicación del navegador e intenta de nuevo.");
-      }
-      try {
-        return { ...(await api.patch<{ ubicacionClienteActualizada: boolean }>(`/visitas/${visitaId}/llegada`, ubicacion)).data, encolada: false as const };
-      } catch (error: any) {
-        // Sin error.response = no llegó al servidor (sin señal) — se guarda
-        // para reintentar solo, en vez de perder el "Llegué" del técnico.
-        if (!error.response) {
-          agregarAccionPendiente("llegada", visitaId, ubicacion);
-          refrescarPendientes();
-          return { ubicacionClienteActualizada: false, encolada: true as const };
-        }
-        throw error;
-      }
-    },
-    onSuccess: (resultado) => {
-      if (resultado.encolada) {
-        mostrarToast("Sin señal — la llegada se guardó en este dispositivo y se enviará sola cuando vuelva la conexión", "success");
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ["mi-ruta-hoy"] });
-      if (resultado.ubicacionClienteActualizada) {
-        queryClient.invalidateQueries({ queryKey: ["clientes"] }); // la ficha del cliente ya tiene la ubicación nueva
-      }
-      mostrarToast(
-        resultado.ubicacionClienteActualizada
-          ? "Llegada registrada — se actualizó la ubicación guardada del cliente"
-          : "Llegada registrada",
-        "success"
-      );
-    },
-    onError: (error: any) => mostrarToast(error.response?.data?.error ?? error.message ?? "Error al registrar la llegada"),
-  });
-
-  const omitirVisita = useMutation({
-    mutationFn: async (visitaId: number) => {
-      const payload = { observaciones: observaciones[visitaId]?.trim() || undefined };
-      try {
-        await api.patch(`/visitas/${visitaId}/omitir`, payload);
-        return { encolada: false };
-      } catch (error: any) {
-        if (!error.response) {
-          agregarAccionPendiente("omitir", visitaId, payload);
-          refrescarPendientes();
-          return { encolada: true };
-        }
-        throw error;
-      }
-    },
-    onSuccess: (resultado) => {
-      if (resultado.encolada) {
-        mostrarToast("Sin señal — se guardó en este dispositivo y se enviará sola cuando vuelva la conexión", "success");
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ["mi-ruta-hoy"] });
-      mostrarToast("Visita omitida", "success");
-    },
-    onError: (error: any) => mostrarToast(error.response?.data?.error ?? "Error al omitir la visita"),
-  });
-
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Mi ruta de hoy</h3>
-        {pendientes.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              🕓 {pendientes.length} acción(es) pendiente(s) de sincronizar
-            </span>
-            <button
-              onClick={() => sincronizarAhora()}
-              className="text-xs font-medium text-slate-700 dark:text-slate-300 hover:underline"
-            >
-              Reintentar ahora
-            </button>
-          </div>
-        )}
-      </div>
-
-      {isLoading && <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>}
-      {!isLoading && !ruta && (
-        <p className="text-sm text-gray-400 dark:text-gray-500">No tienes una ruta planificada para hoy.</p>
-      )}
-
-      {ruta && (
-        <>
-          <MapaRuta
-            alturaPx={520}
-            paradas={ruta.visitas.map(
-              (v): ParadaMapa => ({
-                id: v.id,
-                lat: Number(v.latitud),
-                lng: Number(v.longitud),
-                orden: v.orden,
-                estado: v.estado,
-                etiqueta: v.nombreContacto,
-              })
-            )}
-          />
-          <ul className="divide-y divide-gray-100 dark:divide-gray-700 mt-3">
-            {ruta.visitas.map((v) => {
-              const pendienteLocal = pendientes.some((p) => p.visitaId === v.id);
-              return (
-              <li key={v.id} className={`py-3 ${v.esUrgente ? "bg-red-50 dark:bg-red-900/10 -mx-4 px-4" : ""}`}>
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                      {v.esUrgente && <span className="text-red-600 dark:text-red-400 mr-1">🚨 Urgente —</span>}
-                      {v.orden}. {v.nombreContacto}
-                    </p>
-                    {v.direccion && <p className="text-xs text-gray-500 dark:text-gray-400">{v.direccion}</p>}
-                    {v.estado === "COMPLETADA" && v.distanciaAlPunto && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        Llegada a {Number(v.distanciaAlPunto).toFixed(0)} m del punto planeado
-                      </p>
-                    )}
-                    {v.estado === "OMITIDA" && v.observaciones && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500">Motivo: {v.observaciones}</p>
-                    )}
-                    {pendienteLocal && (
-                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mt-0.5">🕓 Pendiente de sincronizar</p>
-                    )}
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium shrink-0 ${CLASE_ESTADO[v.estado]}`}>
-                    {ETIQUETA_ESTADO[v.estado]}
-                  </span>
-                </div>
-                {v.estado === "PENDIENTE" && !pendienteLocal && (
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <button
-                      onClick={() => marcarLlegada.mutate(v.id)}
-                      disabled={marcarLlegada.isPending}
-                      className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700 disabled:opacity-50"
-                    >
-                      {marcarLlegada.isPending ? "Ubicando..." : "Llegué"}
-                    </button>
-                    <input
-                      type="text"
-                      placeholder="Motivo si la omites (opcional)"
-                      value={observaciones[v.id] ?? ""}
-                      onChange={(e) => setObservaciones({ ...observaciones, [v.id]: e.target.value })}
-                      className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-xs flex-1 min-w-[160px]"
-                    />
-                    <button
-                      onClick={() => omitirVisita.mutate(v.id)}
-                      disabled={omitirVisita.isPending}
-                      className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
-                    >
-                      Omitir
-                    </button>
-                  </div>
-                )}
-                {v.estado === "COMPLETADA" && <DetalleTrabajoVisita visita={v} />}
-              </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
+// "Mi ruta de hoy" (SeccionMiRuta) vive ahora en components/SeccionMiRuta.tsx
+// — se comparte con el shell móvil del técnico (ver AppMovil.tsx). ETIQUETA_ESTADO
+// se re-exporta desde ahí y se importa arriba porque también se usa en el
+// buscador "¿dónde está instalado este equipo?" más abajo.
 
 interface ParadaForm {
   key: string;
@@ -254,6 +46,7 @@ interface ParadaForm {
   clienteSeleccionado: Cliente | null;
   nombreContacto: string;
   direccion: string;
+  motivoVisita: string;
   lat: string;
   lng: string;
 }
@@ -266,6 +59,7 @@ function paradaVacia(): ParadaForm {
     clienteSeleccionado: null,
     nombreContacto: "",
     direccion: "",
+    motivoVisita: "",
     lat: "",
     lng: "",
   };
@@ -331,18 +125,25 @@ function CamposParada({
               placeholder="Nombre de contacto"
               value={valor.nombreContacto}
               onChange={(e) => onCambiar({ ...valor, nombreContacto: e.target.value })}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
             <input
               placeholder="Dirección (opcional, ej. copiada de WhatsApp)"
               value={valor.direccion}
               onChange={(e) => onCambiar({ ...valor, direccion: e.target.value })}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
             />
           </div>
           <CampoPegarUbicacion latitud={valor.lat} longitud={valor.lng} onDetectar={(lat, lng) => onCambiar({ ...valor, lat, lng })} />
         </div>
       )}
+
+      <input
+        placeholder="¿Qué debe hacer el técnico? (opcional, ej. Revisión de equipos, fibra óptica rota)"
+        value={valor.motivoVisita}
+        onChange={(e) => onCambiar({ ...valor, motivoVisita: e.target.value })}
+        className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm mb-2"
+      />
 
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">
         {valor.lat && valor.lng ? "Ajusta el punto en el mapa si hace falta:" : "Toca el mapa en el punto que mandó el cliente por WhatsApp:"}
@@ -364,11 +165,21 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
   const { mostrarToast } = useToast();
   const queryClient = useQueryClient();
   const [empleadoId, setEmpleadoId] = useState("");
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  // A propósito NUNCA new Date().toISOString().slice(0,10): trunca en UTC,
+  // no en hora local — en Ecuador (UTC-5), de noche ya cayó al día
+  // calendario SIGUIENTE, y una ruta "para hoy" quedaba fechada mañana sin
+  // que el despachador lo notara (ver mismo bug ya documentado en
+  // backend/src/utils/rangoFechas.ts).
+  const [fecha, setFecha] = useState(() => {
+    const hoy = new Date();
+    return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+  });
   const [paradas, setParadas] = useState<ParadaForm[]>([]);
   const [nuevaParada, setNuevaParada] = useState<ParadaForm>(paradaVacia());
   const [pagina, setPagina] = useState(1);
   const [filtroEmpleadoId, setFiltroEmpleadoId] = useState("");
+  // Buscador de "Rutas planificadas" (en el servidor: la lista pagina).
+  const filtros = useFiltrosListado(setPagina);
   const [rutaDetalleId, setRutaDetalleId] = useState<number | null>(null);
 
   const { data: empleados } = useQuery({
@@ -377,11 +188,11 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
   });
 
   const { data: respuesta, isLoading: cargandoRutas } = useQuery({
-    queryKey: ["rutas-visita", pagina, filtroEmpleadoId],
+    queryKey: ["rutas-visita", pagina, filtroEmpleadoId, ...filtros.clave],
     queryFn: async () =>
       (
         await api.get<RespuestaPaginada<RutaVisita>>("/visitas/rutas", {
-          params: { page: pagina, pageSize: 10, empleadoId: filtroEmpleadoId || undefined },
+          params: { page: pagina, pageSize: 10, empleadoId: filtroEmpleadoId || undefined, ...filtros.params },
         })
       ).data,
     placeholderData: keepPreviousData,
@@ -418,6 +229,7 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
           clienteId: p.modo === "cliente" ? Number(p.clienteId) : undefined,
           nombreContacto: p.modo === "libre" ? p.nombreContacto.trim() : undefined,
           direccion: p.direccion.trim() || undefined,
+          motivoVisita: p.motivoVisita.trim() || undefined,
           latitud: Number(p.lat),
           longitud: Number(p.lng),
         })),
@@ -433,8 +245,7 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
-      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Planificar rutas</h3>
+    <div className="space-y-4 mb-4">
 
       {puedeEditar && (
         <form
@@ -442,92 +253,131 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
             e.preventDefault();
             crearRuta.mutate();
           }}
-          className="mb-6 space-y-3"
         >
-          <div className="grid grid-cols-2 gap-3">
-            <select
-              required
-              value={empleadoId}
-              onChange={(e) => setEmpleadoId(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-            >
-              <option value="">Técnico...</option>
-              {empleados?.map((e) => (
-                <option key={e.id} value={e.id}>{e.nombres} {e.apellidos}</option>
-              ))}
-            </select>
-            <input
-              type="date"
-              required
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-            />
-          </div>
-
-          <div className="border border-gray-200 dark:border-gray-700 rounded-md p-3">
-            <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Agregar parada</p>
-            <CamposParada valor={nuevaParada} onCambiar={setNuevaParada} alturaMapa={480} />
-
-            <button
-              type="button"
-              onClick={agregarParada}
-              className="mt-2 bg-slate-800 dark:bg-slate-700 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-slate-700 dark:hover:bg-slate-600"
-            >
-              + Agregar parada
-            </button>
-          </div>
-
-          {paradas.length > 0 && (
-            <ul className="divide-y divide-gray-100 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-md">
-              {paradas.map((p, i) => (
-                <li key={p.key} className="flex justify-between items-center px-3 py-2 text-sm">
-                  <span className="text-gray-700 dark:text-gray-300">
-                    {i + 1}. {p.modo === "cliente" ? p.clienteSeleccionado?.razonSocial : p.nombreContacto}
-                    {p.direccion && <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs">({p.direccion})</span>}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => quitarParada(p.key)}
-                    className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium"
-                  >
-                    Quitar
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <button
-            type="submit"
-            disabled={crearRuta.isPending || paradas.length === 0 || !empleadoId}
-            className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+          <MarcoDocumento
+            titulo="Nueva ruta de visitas"
+            sello={
+              <>
+                <ConteoItems cantidad={paradas.length} singular="parada" plural="paradas" />
+                <Sello>Borrador</Sello>
+              </>
+            }
           >
-            {crearRuta.isPending ? "Creando ruta..." : "Crear ruta"}
-          </button>
+            <CabeceraDocumento>
+              <EtiquetaCabecera>Técnico</EtiquetaCabecera>
+              <select required value={empleadoId} onChange={(e) => setEmpleadoId(e.target.value)} className={CLASE_CAMPO}>
+                <option value="">Elegir técnico...</option>
+                {empleados?.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombres} {e.apellidos}
+                  </option>
+                ))}
+              </select>
+              <EtiquetaCabecera>Fecha de la ruta</EtiquetaCabecera>
+              <input type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} className={`${CLASE_CAMPO} font-mono`} />
+            </CabeceraDocumento>
+
+            {/* Línea de ingreso: la parada que se está armando */}
+            <div className="mx-4 border border-stone-300 dark:border-gray-700 bg-stone-50 dark:bg-gray-900/40 p-3">
+              <p className={`${CLASE_ETIQUETA} mb-2`}>Agregar parada · cliente registrado o contacto libre</p>
+              <CamposParada valor={nuevaParada} onCambiar={setNuevaParada} alturaMapa={480} />
+              <button
+                type="button"
+                onClick={agregarParada}
+                className="mt-2 bg-brand-700 text-white px-3 py-1.5 rounded-sm text-sm font-semibold hover:bg-brand-800"
+              >
+                Agregar parada ↵
+              </button>
+            </div>
+
+            {/* Detalle: paradas de la ruta, en orden */}
+            <DetalleDocumento>
+              <thead>
+                <tr className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700">
+                  <th className={`${CLASE_TH} w-10`}>#</th>
+                  <th className={CLASE_TH}>Cliente / contacto</th>
+                  <th className={CLASE_TH}>Dirección</th>
+                  <th className={CLASE_TH}>Motivo</th>
+                  <th className={`${CLASE_TH} w-10`}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paradas.length === 0 && (
+                  <FilaDetalleVacia columnas={5}>Agrega al menos una parada para poder crear la ruta.</FilaDetalleVacia>
+                )}
+                {paradas.map((p, i) => (
+                  <tr key={p.key} className="border-b border-stone-100 dark:border-gray-700/60 last:border-b-0">
+                    <td className="px-3 py-1.5 font-mono text-xs text-gray-400">{i + 1}</td>
+                    <td className="px-3 py-1.5 text-gray-800 dark:text-gray-100">
+                      {p.modo === "cliente" ? p.clienteSeleccionado?.razonSocial : p.nombreContacto}
+                      {p.modo === "cliente" && p.clienteSeleccionado?.identificacion && (
+                        <span className="block font-mono text-[11px] text-gray-400 dark:text-gray-500">{p.clienteSeleccionado.identificacion}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-gray-600 dark:text-gray-300">{p.direccion || "—"}</td>
+                    <td className="px-3 py-1.5 text-gray-600 dark:text-gray-300">{p.motivoVisita || "—"}</td>
+                    <td className="px-2 py-1.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => quitarParada(p.key)}
+                        title="Quitar parada"
+                        className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DetalleDocumento>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 p-4 items-start">
+              <p className="text-xs text-gray-400 dark:text-gray-500 lg:pt-2">
+                El técnico ve esta ruta en "Mi ruta de hoy" (celular) el día elegido, con las paradas en este orden.
+              </p>
+              <BotonConfirmar type="submit" disabled={crearRuta.isPending || paradas.length === 0 || !empleadoId}>
+                {crearRuta.isPending ? "Creando ruta..." : "Crear ruta"}
+              </BotonConfirmar>
+            </div>
+          </MarcoDocumento>
         </form>
       )}
 
-      <div className="flex justify-between items-center mb-2">
-        <p className="text-xs font-medium text-gray-600 dark:text-gray-300">Rutas planificadas</p>
-        <select
-          value={filtroEmpleadoId}
-          onChange={(e) => {
-            setFiltroEmpleadoId(e.target.value);
-            setPagina(1);
-          }}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-xs"
-        >
-          <option value="">Todos los técnicos</option>
-          {empleados?.map((e) => (
-            <option key={e.id} value={e.id}>{e.nombres} {e.apellidos}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+          <h3 className="text-base font-bold text-gray-900 dark:text-gray-50">Rutas planificadas</h3>
+          <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+            {respuesta ? `${respuesta.paginacion.total} ruta${respuesta.paginacion.total === 1 ? "" : "s"}` : ""}
+          </span>
+        </div>
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · técnico, cliente, contacto, dirección o motivo"
+          placeholder="Ej: Pérez, fibra rota, Av. Loja..."
+          mostrarPago={false}
+          extras={
+            <label className="flex flex-col gap-1 w-48">
+              <span className={CLASE_ETIQUETA}>Técnico</span>
+              <select
+                value={filtroEmpleadoId}
+                onChange={(e) => {
+                  setFiltroEmpleadoId(e.target.value);
+                  setPagina(1);
+                }}
+                className={CLASE_CAMPO}
+              >
+                <option value="">Todos los técnicos</option>
+                {empleados?.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombres} {e.apellidos}
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+        />
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-3 py-2">Fecha</th>
               <th className="px-3 py-2">Técnico</th>
@@ -545,20 +395,20 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
             )}
             {!cargandoRutas && rutas?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-3 text-center text-gray-400 dark:text-gray-500">Sin rutas planificadas todavía</td>
+                <td colSpan={6} className="px-3 py-3 text-center text-gray-400 dark:text-gray-500">{filtros.hayFiltros || filtroEmpleadoId ? "Ninguna ruta coincide con la búsqueda." : "Sin rutas planificadas todavía"}</td>
               </tr>
             )}
             {rutas?.map((r) => (
-              <tr key={r.id} className="border-t border-gray-100 dark:border-gray-700">
-                <td className="px-3 py-2">{r.fecha.slice(0, 10)}</td>
-                <td className="px-3 py-2">{r.empleado.nombres} {r.empleado.apellidos}</td>
+              <tr key={r.id} className="border-t border-stone-100 dark:border-gray-700">
+                <td className="px-3 py-2 font-mono text-xs">{r.fecha.slice(0, 10)}</td>
+                <td className="px-3 py-2"><Resaltar texto={`${r.empleado.nombres} ${r.empleado.apellidos}`} termino={filtros.busquedaAplicada} /></td>
                 <td className="px-3 py-2">{r.visitas.length}</td>
                 <td className="px-3 py-2">{r.visitas.filter((v) => v.estado === "COMPLETADA").length}</td>
                 <td className="px-3 py-2">{r.visitas.filter((v) => v.estado === "OMITIDA").length}</td>
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={() => setRutaDetalleId(r.id)}
-                    className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                    className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                   >
                     Ver detalle
                   </button>
@@ -581,7 +431,14 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
         (() => {
           const ruta = rutas?.find((r) => r.id === rutaDetalleId);
           if (!ruta) return null;
-          return <ModalDetalleRuta ruta={ruta} onCerrar={() => setRutaDetalleId(null)} />;
+          return (
+            <ModalDetalleRuta
+              ruta={ruta}
+              empleados={empleados ?? []}
+              puedeEditar={puedeEditar}
+              onCerrar={() => setRutaDetalleId(null)}
+            />
+          );
         })()}
     </div>
   );
@@ -594,11 +451,26 @@ function SeccionPlanificar({ puedeEditar }: { puedeEditar: boolean }) {
 // del mapa) — en algunos equipos el overlay "fixed" no se pintaba en
 // pantalla hasta forzar un repintado; en flujo normal de la página no tiene
 // ese problema.
-function ModalDetalleRuta({ ruta, onCerrar }: { ruta: RutaVisita; onCerrar: () => void }) {
+function ModalDetalleRuta({
+  ruta,
+  empleados,
+  puedeEditar,
+  onCerrar,
+}: {
+  ruta: RutaVisita;
+  empleados: Empleado[];
+  puedeEditar: boolean;
+  onCerrar: () => void;
+}) {
+  const pendientes = ruta.visitas.filter((v) => v.estado === "PENDIENTE");
+  // Técnicos a los que se puede pasar una visita: activos y distintos al
+  // dueño de esta ruta.
+  const destinos = empleados.filter((e) => e.id !== ruta.empleadoId);
+
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 mt-4">
+    <div className="border border-stone-300 dark:border-gray-700 rounded-sm p-4 mt-4">
       <div className="flex justify-between items-center mb-3">
-        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+        <h4 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">
           Detalle — {ruta.empleado.nombres} {ruta.empleado.apellidos} ({ruta.fecha.slice(0, 10)})
         </h4>
         <button
@@ -609,21 +481,206 @@ function ModalDetalleRuta({ ruta, onCerrar }: { ruta: RutaVisita; onCerrar: () =
           ×
         </button>
       </div>
+
+      {puedeEditar && pendientes.length > 0 && destinos.length > 0 && (
+        <BarraReasignarRuta ruta={ruta} pendientes={pendientes.length} destinos={destinos} onListo={onCerrar} />
+      )}
+
       <div className="space-y-4">
         {ruta.visitas.map((v) => (
-          <TarjetaVisitaDetalle
-            key={v.id}
-            visita={v}
-            encabezado={
-              <>
-                {v.orden}. {v.nombreContacto}
-                {v.cliente && <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs font-normal">({v.cliente.identificacion})</span>}
-              </>
-            }
-          />
+          <div key={v.id}>
+            <TarjetaVisitaDetalle
+              visita={v}
+              encabezado={
+                <>
+                  {v.orden}. {v.nombreContacto}
+                  {v.cliente && <span className="text-gray-400 dark:text-gray-500 ml-1 text-xs font-normal">({v.cliente.identificacion})</span>}
+                </>
+              }
+            />
+            {puedeEditar && v.estado === "PENDIENTE" && destinos.length > 0 && (
+              <ReasignarVisita visitaId={v.id} nombreContacto={v.nombreContacto} destinos={destinos} onListo={onCerrar} />
+            )}
+          </div>
         ))}
       </div>
       <FormularioVisitaFlash ruta={ruta} />
+    </div>
+  );
+}
+
+// Pasa UNA visita pendiente a otro técnico (PATCH /visitas/:id/reasignar).
+// La confirmación es EN FLUJO (un segundo paso "¿Sí/No?" en la misma barra),
+// no un <Modal> flotante — en algunos equipos el overlay "fixed" no se pinta
+// (ver la nota en ModalDetalleRuta y en FormularioVisitaFlash).
+function ReasignarVisita({
+  visitaId,
+  nombreContacto,
+  destinos,
+  onListo,
+}: {
+  visitaId: number;
+  nombreContacto: string;
+  destinos: Empleado[];
+  onListo: () => void;
+}) {
+  const { mostrarToast } = useToast();
+  const queryClient = useQueryClient();
+  const [empleadoId, setEmpleadoId] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+
+  const reasignar = useMutation({
+    mutationFn: async () => api.patch(`/visitas/${visitaId}/reasignar`, { empleadoId: Number(empleadoId) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rutas-visita"] });
+      queryClient.invalidateQueries({ queryKey: ["mi-ruta-hoy"] });
+      mostrarToast("Visita reasignada", "success");
+      onListo();
+    },
+    onError: (error: any) => {
+      setConfirmando(false);
+      mostrarToast(error.response?.data?.error ?? "Error al reasignar la visita");
+    },
+  });
+
+  const destino = destinos.find((e) => e.id === Number(empleadoId));
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 mt-1 pl-3">
+      <span className="text-xs text-gray-400 dark:text-gray-500">Reasignar a:</span>
+      <select
+        value={empleadoId}
+        onChange={(e) => {
+          setEmpleadoId(e.target.value);
+          setConfirmando(false);
+        }}
+        className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-xs"
+      >
+        <option value="">Elegir técnico...</option>
+        {destinos.map((e) => (
+          <option key={e.id} value={e.id}>{e.nombres} {e.apellidos}</option>
+        ))}
+      </select>
+      {!confirmando ? (
+        <button
+          onClick={() => setConfirmando(true)}
+          disabled={!empleadoId}
+          className="bg-slate-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-brand-800 disabled:opacity-50"
+        >
+          Reasignar
+        </button>
+      ) : (
+        <>
+          <span className="text-xs text-gray-600 dark:text-gray-300">
+            ¿Pasar "{nombreContacto}" a {destino?.nombres} {destino?.apellidos}?
+          </span>
+          <button
+            onClick={() => reasignar.mutate()}
+            disabled={reasignar.isPending}
+            className="bg-slate-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-brand-800 disabled:opacity-50"
+          >
+            {reasignar.isPending ? "Reasignando..." : "Sí, reasignar"}
+          </button>
+          <button
+            onClick={() => setConfirmando(false)}
+            disabled={reasignar.isPending}
+            className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:underline"
+          >
+            Cancelar
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Pasa TODAS las visitas pendientes de la ruta a otro técnico
+// (PATCH /visitas/rutas/:id/reasignar) — el caso "se dañó el vehículo,
+// muévanle el resto del día a otro". Confirmación en flujo, igual que
+// ReasignarVisita.
+function BarraReasignarRuta({
+  ruta,
+  pendientes,
+  destinos,
+  onListo,
+}: {
+  ruta: RutaVisita;
+  pendientes: number;
+  destinos: Empleado[];
+  onListo: () => void;
+}) {
+  const { mostrarToast } = useToast();
+  const queryClient = useQueryClient();
+  const [empleadoId, setEmpleadoId] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+
+  const reasignar = useMutation({
+    mutationFn: async () => api.patch(`/visitas/rutas/${ruta.id}/reasignar`, { empleadoId: Number(empleadoId) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rutas-visita"] });
+      queryClient.invalidateQueries({ queryKey: ["mi-ruta-hoy"] });
+      mostrarToast(`${pendientes} visita(s) reasignada(s)`, "success");
+      onListo();
+    },
+    onError: (error: any) => {
+      setConfirmando(false);
+      mostrarToast(error.response?.data?.error ?? "Error al reasignar las visitas");
+    },
+  });
+
+  const destino = destinos.find((e) => e.id === Number(empleadoId));
+
+  return (
+    <div className="mb-3 p-2 rounded-md bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-900/40">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+          Reasignar las {pendientes} pendiente(s) a:
+        </span>
+        <select
+          value={empleadoId}
+          onChange={(e) => {
+            setEmpleadoId(e.target.value);
+            setConfirmando(false);
+          }}
+          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-xs"
+        >
+          <option value="">Elegir técnico...</option>
+          {destinos.map((e) => (
+            <option key={e.id} value={e.id}>{e.nombres} {e.apellidos}</option>
+          ))}
+        </select>
+        {!confirmando ? (
+          <button
+            onClick={() => setConfirmando(true)}
+            disabled={!empleadoId}
+            className="bg-amber-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-amber-700 disabled:opacity-50"
+          >
+            Reasignar todas
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={() => reasignar.mutate()}
+              disabled={reasignar.isPending}
+              className="bg-amber-600 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-amber-700 disabled:opacity-50"
+            >
+              {reasignar.isPending ? "Reasignando..." : `Sí, pasar a ${destino?.nombres}`}
+            </button>
+            <button
+              onClick={() => setConfirmando(false)}
+              disabled={reasignar.isPending}
+              className="text-xs font-medium text-amber-800 dark:text-amber-300 hover:underline"
+            >
+              Cancelar
+            </button>
+          </>
+        )}
+      </div>
+      {confirmando && (
+        <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5">
+          Las visitas ya completadas u omitidas se quedan con {ruta.empleado.nombres} {ruta.empleado.apellidos}.
+        </p>
+      )}
     </div>
   );
 }
@@ -653,6 +710,7 @@ function FormularioVisitaFlash({ ruta }: { ruta: RutaVisita }) {
         clienteId: parada.modo === "cliente" ? Number(parada.clienteId) : undefined,
         nombreContacto: parada.modo === "libre" ? parada.nombreContacto.trim() : undefined,
         direccion: parada.direccion.trim() || undefined,
+        motivoVisita: parada.motivoVisita.trim() || undefined,
         latitud: Number(parada.lat),
         longitud: Number(parada.lng),
       });
@@ -700,7 +758,7 @@ function FormularioVisitaFlash({ ruta }: { ruta: RutaVisita }) {
             setAbierto(false);
             setParada(paradaVacia());
           }}
-          className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-600"
+          className="bg-stone-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-600"
         >
           Cancelar
         </button>
@@ -710,9 +768,11 @@ function FormularioVisitaFlash({ ruta }: { ruta: RutaVisita }) {
 }
 
 // Buscar en TODOS los equipos dejados en visitas (cualquier cliente) por
-// tipo, modelo o serial/MAC — para responder "¿dónde está instalado este
-// equipo?" sin tener que abrir cliente por cliente. Sección en línea, no
-// ventana flotante (ver nota en ModalDetalleRuta más arriba).
+// tipo, modelo, serial/MAC, o por el cliente (nombre/razón social o
+// cédula/RUC) — responde tanto "¿dónde está instalado este equipo?" como
+// "¿qué equipos tiene este cliente y qué técnico se los entregó?" con el
+// mismo buscador, sin tener que abrir cliente por cliente. Sección en línea,
+// no ventana flotante (ver nota en ModalDetalleRuta más arriba).
 function BuscadorEquiposInstalados() {
   const [texto, setTexto] = useState("");
   const textoDebounced = useDebounce(texto);
@@ -744,13 +804,13 @@ function BuscadorEquiposInstalados() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 mb-4">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Buscar equipo instalado</h3>
+    <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4 mb-4">
+      <div className="flex flex-wrap justify-between items-center gap-3 -mx-4 -mt-4 mb-3 px-4 py-3 border-b border-stone-300 dark:border-gray-700">
+        <h3 className="text-base font-bold text-gray-900 dark:text-gray-50">Buscar equipo instalado</h3>
         {resultados && resultados.length > 0 && (
           <button
             onClick={exportarExcel}
-            className="bg-brand-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-brand-700"
+            className="bg-brand-700 text-white px-3 py-1.5 rounded-sm text-xs font-semibold hover:bg-brand-800"
           >
             Exportar a Excel
           </button>
@@ -760,8 +820,8 @@ function BuscadorEquiposInstalados() {
         type="text"
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
-        placeholder="Buscar por serial, MAC, modelo o tipo (ej. RB750, Router Mikrotik)..."
-        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm mb-3"
+        placeholder="Buscar por serial, MAC, modelo, tipo, o nombre/cédula del cliente..."
+        className={`${CLASE_CAMPO} mb-3`}
       />
 
       {textoDebounced.trim().length < 2 && (
@@ -773,7 +833,7 @@ function BuscadorEquiposInstalados() {
       )}
       {resultados && resultados.length > 0 && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-3 py-2">Tipo</th>
               <th className="px-3 py-2">Modelo</th>
@@ -786,7 +846,7 @@ function BuscadorEquiposInstalados() {
           </thead>
           <tbody>
             {resultados.map((eq) => (
-              <tr key={eq.id} className="border-t border-gray-100 dark:border-gray-700">
+              <tr key={eq.id} className="border-t border-stone-100 dark:border-gray-700">
                 <td className="px-3 py-2">{eq.tipo}</td>
                 <td className="px-3 py-2">{eq.modelo ?? "—"}</td>
                 <td className="px-3 py-2 font-mono text-xs">{eq.serial ?? "—"}</td>
@@ -814,7 +874,7 @@ export function VisitasPage() {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Visitas Técnicas</h2>
+      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-4">Visitas Técnicas</h2>
 
       {tieneEmpleadoVinculado && <SeccionMiRuta />}
       {(puedeVer || puedeEditarVisitas) && <SeccionPlanificar puedeEditar={puedeEditarVisitas} />}

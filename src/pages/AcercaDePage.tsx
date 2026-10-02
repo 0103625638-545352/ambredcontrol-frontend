@@ -466,7 +466,7 @@ export function AcercaDePage() {
   return (
     <div>
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Acerca de / Manual de Usuario</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-1">Acerca de / Manual de Usuario</h2>
         <p className="text-sm text-gray-600 dark:text-gray-300">
           AmbrossISP PYMES es un sistema de facturación e inventario para negocios ecuatorianos, que cumple con los
           requisitos de facturación electrónica del SRI (Servicio de Rentas Internas). Esta guía explica, en lenguaje
@@ -479,7 +479,7 @@ export function AcercaDePage() {
           <button
             key={s.id}
             onClick={() => irASeccion(s.id)}
-            className="px-3 py-1.5 rounded-md text-xs font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+            className="px-3 py-1.5 rounded-md text-xs font-medium border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
           >
             {s.titulo}
           </button>
@@ -493,17 +493,17 @@ export function AcercaDePage() {
             ref={(el) => {
               refs.current[seccion.id] = el;
             }}
-            className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4 scroll-mt-4"
+            className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4 scroll-mt-4"
           >
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">{seccion.titulo}</h3>
+            <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300 mb-3">{seccion.titulo}</h3>
             <div className="space-y-2">
               {seccion.temas.map((tema, i) => (
-                <details key={i} className="group border border-gray-200 dark:border-gray-700 rounded-md">
-                  <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-900/40 rounded-md">
+                <details key={i} className="group border border-stone-300 dark:border-gray-700 rounded-md">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center justify-between hover:bg-stone-50 dark:hover:bg-gray-900/40 rounded-md">
                     {tema.pregunta}
                     <ChevronRight strokeWidth={2} className="w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform group-open:rotate-90" />
                   </summary>
-                  <div className="px-3 pb-3 pt-1 text-sm text-gray-600 dark:text-gray-300 space-y-2 border-t border-gray-100 dark:border-gray-700">
+                  <div className="px-3 pb-3 pt-1 text-sm text-gray-600 dark:text-gray-300 space-y-2 border-t border-stone-100 dark:border-gray-700">
                     {tema.respuesta}
                   </div>
                 </details>

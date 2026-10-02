@@ -19,7 +19,7 @@ let siguienteId = 1;
 const estilosPorTipo: Record<TipoToast, string> = {
   error: "bg-red-600 text-white",
   success: "bg-emerald-600 text-white",
-  info: "bg-slate-800 text-white",
+  info: "bg-brand-700 text-white",
 };
 
 // Reemplaza los alert()/window.confirm() del navegador — no bloquean el
@@ -55,7 +55,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`rounded-md shadow-lg px-4 py-3 text-sm flex items-start justify-between gap-3 pointer-events-auto ${estilosPorTipo[t.tipo]}`}
+            className={`rounded-sm shadow-lg px-4 py-3 text-sm font-medium flex items-start justify-between gap-3 pointer-events-auto ${estilosPorTipo[t.tipo]}`}
           >
             <span>{t.mensaje}</span>
             <button onClick={() => cerrar(t.id)} className="opacity-70 hover:opacity-100 text-lg leading-none shrink-0">

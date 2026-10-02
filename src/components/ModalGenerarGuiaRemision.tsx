@@ -144,11 +144,11 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
               <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Destinatario</p>
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Tipo de identificación</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Tipo de identificación</label>
               <select
                 value={destinatarioTipoIdentificacion}
                 onChange={(e) => setDestinatarioTipoIdentificacion(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               >
                 {TIPOS_IDENTIFICACION.map((t) => (
                   <option key={t.valor} value={t.valor}>{t.etiqueta}</option>
@@ -157,38 +157,38 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Identificación</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Identificación</label>
               <input
                 type="text"
                 value={destinatarioIdentificacion}
                 onChange={(e) => setDestinatarioIdentificacion(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Razón social</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Razón social</label>
               <input
                 type="text"
                 value={destinatarioRazonSocial}
                 onChange={(e) => setDestinatarioRazonSocial(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Dirección de entrega</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Dirección de entrega</label>
               <input
                 type="text"
                 value={destinatarioDireccion}
                 onChange={(e) => setDestinatarioDireccion(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Motivo del traslado</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Motivo del traslado</label>
               <select
                 value={motivoTraslado}
                 onChange={(e) => setMotivoTraslado(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               >
                 {MOTIVOS_TRASLADO.map((m) => (
                   <option key={m.valor} value={m.valor}>{m.etiqueta}</option>
@@ -196,26 +196,26 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Ruta (opcional)</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Ruta (opcional)</label>
               <input
                 type="text"
                 value={ruta}
                 onChange={(e) => setRuta(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-3 grid grid-cols-2 gap-3 mb-3">
+          <div className="border-t border-stone-300 dark:border-gray-700 pt-3 grid grid-cols-2 gap-3 mb-3">
             <div className="col-span-2">
               <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Transportista y vehículo</p>
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Tipo de identificación</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Tipo de identificación</label>
               <select
                 value={transportistaTipoIdentificacion}
                 onChange={(e) => setTransportistaTipoIdentificacion(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               >
                 {TIPOS_IDENTIFICACION.map((t) => (
                   <option key={t.valor} value={t.valor}>{t.etiqueta}</option>
@@ -223,62 +223,62 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Identificación</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Identificación</label>
               <input
                 type="text"
                 value={transportistaIdentificacion}
                 onChange={(e) => setTransportistaIdentificacion(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Razón social del transportista</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Razón social del transportista</label>
               <input
                 type="text"
                 value={transportistaRazonSocial}
                 onChange={(e) => setTransportistaRazonSocial(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Placa</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Placa</label>
               <input
                 type="text"
                 value={placa}
                 onChange={(e) => setPlaca(e.target.value.toUpperCase())}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Dirección de partida</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Dirección de partida</label>
               <input
                 type="text"
                 value={dirPartida}
                 onChange={(e) => setDirPartida(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Fecha inicio traslado</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Fecha inicio traslado</label>
               <input
                 type="date"
                 value={fechaIniTransporte}
                 onChange={(e) => setFechaIniTransporte(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 dark:text-gray-400">Fecha fin traslado</label>
+              <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">Fecha fin traslado</label>
               <input
                 type="date"
                 value={fechaFinTransporte}
                 onChange={(e) => setFechaFinTransporte(e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1 text-sm"
               />
             </div>
           </div>
 
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
+          <div className="border-t border-stone-300 dark:border-gray-700 pt-3 mb-3">
             <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
               Bienes a transportar (cantidad facturada por defecto — ajusta si el envío no viaja completo)
             </p>
@@ -287,7 +287,7 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
                 const cantidadNum = parseInt(it.cantidad, 10) || 0;
                 const excede = cantidadNum > it.cantidadFacturada;
                 return (
-                  <div key={it.productoId} className="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-700 pb-1">
+                  <div key={it.productoId} className="flex items-center justify-between text-sm border-b border-stone-100 dark:border-gray-700 pb-1">
                     <div>
                       <p className="text-gray-800 dark:text-gray-100">{it.nombre}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Facturado: {it.cantidadFacturada}</p>
@@ -298,7 +298,7 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
                       max={it.cantidadFacturada}
                       value={it.cantidad}
                       onChange={(e) => actualizarCantidad(it.productoId, e.target.value)}
-                      className={`w-20 border rounded px-2 py-1 text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${excede ? "border-red-500" : "border-gray-300 dark:border-gray-600"}`}
+                      className={`w-20 border rounded px-2 py-1 text-center bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${excede ? "border-red-500" : "border-stone-300 dark:border-gray-600"}`}
                     />
                   </div>
                 );
@@ -315,7 +315,7 @@ export function ModalGenerarGuiaRemision({ facturaId, onCerrar }: Props) {
             type="button"
             onClick={() => generarGuia.mutate()}
             disabled={!formularioValido || generarGuia.isPending}
-            className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40"
+            className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-40"
           >
             {generarGuia.isPending ? "Generando..." : "Generar guía de remisión"}
           </button>

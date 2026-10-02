@@ -17,3 +17,7 @@ dist-ssr/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Logs locales de desarrollo
+.dev-frontend.log
+*.log

@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AmbrossISP PYMES</string>
+    <string name="title_activity_main">AmbrossISP PYMES</string>
+    <string name="package_name">com.ambrossisp.pymes</string>
+    <string name="custom_url_scheme">com.ambrossisp.pymes</string>
+    <!-- Canal de la notificación fija "compartiendo ubicación" del plugin de
+         rastreo en segundo plano (ver hooks/useUbicacionTecnico.ts). -->
+    <string name="capacitor_background_geolocation_notification_channel_name">Ubicación del técnico</string>
+    <string name="capacitor_background_geolocation_notification_color">#123f3a</string>
+</resources>

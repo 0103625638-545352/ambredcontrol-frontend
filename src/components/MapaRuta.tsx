@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { agregarCapasBase } from "../utils/capasMapaBase";
 
 export interface ParadaMapa {
   id: number;
@@ -39,10 +40,7 @@ export function MapaRuta({ paradas, alturaPx = 320 }: Props) {
     const mapa = L.map(contenedorRef.current).setView(centro, 13);
     mapaRef.current = mapa;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(mapa);
+    agregarCapasBase(mapa);
 
     capaMarcadoresRef.current = L.layerGroup().addTo(mapa);
 

@@ -4,8 +4,16 @@
 // actualiza en un solo lugar.
 
 import axios from "axios";
+import { guardarTokenParaServiceWorker } from "../utils/serviceWorkerTecnico";
 
-export const URL_BASE_API = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// Si VITE_API_URL está seteado (frontend/.env.local), se respeta tal cual.
+// Si no, se arma solo a partir del host con el que se entró a la app: el
+// celular que entra por la IP LAN de esta PC (ej. https://192.168.1.182:5173)
+// necesita hablarle al backend en esa MISMA IP, puerto 3000 — así no hay que
+// tocar ningún archivo cuando la IP cambie (WiFi <-> cable, DHCP, otra red),
+// solo que el backend tenga HTTPS_LOCAL_AUTO="true" (ver backend/.env.example).
+export const URL_BASE_API =
+  import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:3000`;
 
 export const api = axios.create({
   baseURL: URL_BASE_API,
@@ -31,6 +39,7 @@ api.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("usuario");
       localStorage.removeItem("empresa");
+      guardarTokenParaServiceWorker(null);
       window.location.reload(); // recarga la app, que mostrará el login al no encontrar token
     }
     return Promise.reject(error);
@@ -102,6 +111,8 @@ export interface Categoria {
   nombre: string;
   activo?: boolean;
   createdAt?: string;
+  // Cuántos productos la tienen asignada (GET /categorias lo incluye).
+  _count?: { productos: number };
 }
 
 export interface Producto {
@@ -357,8 +368,30 @@ export interface Cliente {
   // se valida el pago de su plan y se corta si no pagó. null = sigue con el
   // día de corte general de la empresa (Ajustes), como antes de este campo.
   fechaContrato?: string | null;
+  // Vigencia mínima pactada + control de baja (ver backend/src/routes/clientes.ts
+  // y utils/vigenciaContrato.ts). fechaInicioServicio es distinta de
+  // fechaContrato (esa es el día de corte de pago); vigenciaContratoMeses
+  // solo acepta 6, 12, 24 o 36.
+  fechaInicioServicio?: string | null;
+  vigenciaContratoMeses?: number | null;
+  // Baja definitiva (distinta de "Suspendido" en el Mikrotik, que es
+  // reversible). activo=false = cliente retirado.
+  activo?: boolean;
+  fechaBaja?: string | null;
+  motivoBaja?: string | null;
+  // Calculado por el backend a partir de fechaInicioServicio/vigenciaContratoMeses
+  // (comparado contra fechaBaja si ya se dio de baja, o contra "ahora" si
+  // sigue activo) — null si el cliente no tiene vigencia pactada.
+  vigencia?: {
+    fechaFinVigencia: string;
+    cumplioVigencia: boolean;
+    diasFaltantes: number;
+  } | null;
   createdAt?: string;
 }
+
+// Plazos válidos para Cliente.vigenciaContratoMeses (ver backend/src/utils/vigenciaContrato.ts).
+export const OPCIONES_VIGENCIA_MESES = [6, 12, 24, 36] as const;
 
 // Respuesta de POST/PUT /clientes — igual que Cliente, más una advertencia
 // no bloqueante si la sincronización con el Mikrotik falló (el cliente de
@@ -387,6 +420,11 @@ export interface NodoRed {
   // para calcular "sin conexión desde hace X" cuando está caído (ver
   // NodosPage.tsx); se actualiza solo en el backend en cada chequeo exitoso.
   ultimaConexionExitosa?: string | null;
+  // Ubicación física del armario/caseta — se carga desde el mapa de Red
+  // Física (ver RedFisicaPage.tsx) con PATCH /nodos-red/:id/ubicacion, no
+  // desde el formulario normal de edición. null = todavía no ubicado.
+  latitud?: string | null;
+  longitud?: string | null;
   activo?: boolean;
   createdAt?: string;
 }
@@ -413,6 +451,282 @@ export interface VlanDetectada {
   nombre: string;
   vlanId: number;
   interfaz: string;
+}
+
+// Una OLT Huawei (MA5608T / MA5800-X7) — ver OltsPage.tsx. Los secretos SNMP
+// (comunidad, auth/priv password) NUNCA vuelven del backend, mismo criterio
+// que NodoRed.mikrotikPassword: al editar, dejarlos vacíos significa "no
+// cambiarlos".
+export interface Olt {
+  id: number;
+  nombre: string;
+  modelo: string; // "MA5608T" | "MA5800-X7"
+  direccionIp: string;
+  snmpPuerto: number;
+  snmpVersion: string; // "1" | "2c" | "3"
+  snmpUsuario?: string | null;
+  snmpAuthProtocolo?: string | null; // "MD5" | "SHA"
+  snmpPrivProtocolo?: string | null; // "DES" | "AES"
+  // SSH (VRP CLI) — usado solo por la Vista por puerto GPON (ver
+  // VistaPuertoOlt.tsx); sshPassword nunca vuelve del backend.
+  sshPuerto?: number;
+  sshUsuario?: string | null;
+  ubicacion?: string | null;
+  nodoId?: number | null;
+  nodo?: { id: number; nombre: string } | null;
+  // Última vez que "Sincronizar ahora" (o el polling automático) logró
+  // conectarse — null = nunca. Mismo criterio que NodoRed.ultimaConexionExitosa.
+  ultimaConexionExitosa?: string | null;
+  activo?: boolean;
+  createdAt?: string;
+}
+
+// Una ONU (equipo de cliente) detectada por SNMP en un puerto PON de una
+// OLT. estado/rxPowerDbm/txPowerDbm/ultimaLectura son un CACHÉ del último
+// dato leído — se pisan en cada sincronización (ver OltEvento para el
+// historial de cambios). El sistema NUNCA aprovisiona la ONU en la OLT: solo
+// registra qué Cliente le corresponde (ver PATCH .../asignar-cliente).
+export interface OltOnu {
+  id: number;
+  oltId: number;
+  frame?: number;
+  slot: number;
+  puerto: number;
+  onuIndex: number;
+  serial: string;
+  descripcion?: string | null;
+  clienteId?: number | null;
+  cliente?: { id: number; razonSocial: string; identificacion: string } | null;
+  estado?: string | null; // "ONLINE" | "OFFLINE" | null = todavía no sincronizada
+  rxPowerDbm?: string | null;
+  txPowerDbm?: string | null;
+  // Solo los trae la Vista por puerto GPON (SSH) — null si esta ONU nunca se
+  // consultó por ese camino (ver VistaPuertoOlt.tsx).
+  temperaturaCelsius?: string | null;
+  distanciaMetros?: number | null;
+  ipGestion?: string | null;
+  ultimaLectura?: string | null;
+  activo?: boolean;
+  createdAt?: string;
+}
+
+// Un punto del trazado de un TendidoFibra, en el orden dibujado — ver
+// RedFisicaPage.tsx / MapaRedFisica.tsx.
+export interface PuntoRuta {
+  lat: number;
+  lng: number;
+}
+
+// Una caja/NAP puntual del trazado de fibra (ver comentario "Módulo de RED
+// FÍSICA" en schema.prisma) — reemplaza el uso de Google Earth para marcar
+// estos puntos.
+export interface CajaFibra {
+  id: number;
+  codigo: string;
+  tipo: string; // "NAP" | "Empalme" | "Murete" | "Poste" | "Cámara" — texto libre
+  latitud: string;
+  longitud: string;
+  capacidadPuertos?: number | null;
+  descripcion?: string | null;
+  nodoId?: number | null;
+  nodo?: { id: number; nombre: string } | null;
+  activo?: boolean;
+  createdAt?: string;
+}
+
+// Un tramo de cable trazado sobre el mapa — el equivalente a una línea
+// dibujada en Google Earth. La distancia se calcula en el navegador a partir
+// de "trazado" (ver utils/geoFibra.ts), nunca viaja del backend.
+export interface TendidoFibra {
+  id: number;
+  nombre?: string | null;
+  tipo: string; // "Troncal" | "Distribución" | "Acometida" — texto libre
+  trazado: PuntoRuta[];
+  origenCajaId?: number | null;
+  origenCaja?: { id: number; codigo: string } | null;
+  destinoCajaId?: number | null;
+  destinoCaja?: { id: number; codigo: string } | null;
+  nodoId?: number | null;
+  nodo?: { id: number; nombre: string } | null;
+  estado: string; // "ACTIVO" | "CORTADO" | "EN_MANTENIMIENTO"
+  colorHex?: string | null;
+  activo?: boolean;
+  createdAt?: string;
+}
+
+// Vista previa de POST /red-fisica/importar-kml — candidatos leídos de un
+// .kml/.kmz de Google Earth, todavía SIN guardar. El usuario los revisa
+// (elige tipo/nodo) antes de mandarlos a /importar-kml/confirmar.
+export interface CajaCandidataKml {
+  nombreSugerido: string;
+  // Copiado de un campo ExtendedData del propio archivo (ej. "Tipo") o, si
+  // no hay, del nombre de la carpeta de Google Earth que contiene el
+  // placemark — nunca inventado, para no meter errores de tipografía al
+  // tener que re-escribirlo. undefined = no se pudo detectar, se elige a mano.
+  tipoSugerido?: string;
+  latitud: number;
+  longitud: number;
+  descripcion?: string;
+}
+export interface TendidoCandidatoKml {
+  nombreSugerido: string;
+  tipoSugerido?: string;
+  trazado: PuntoRuta[];
+  descripcion?: string;
+}
+export interface PreviaImportacionKml {
+  cajas: CajaCandidataKml[];
+  tendidos: TendidoCandidatoKml[];
+  omitidos: number;
+}
+
+// Fila de la tabla que devuelve POST /olts/:id/puertos/consultar — una ONT
+// puntual de un puerto GPON, con la señal de alerta ya calculada en el
+// backend (ver UMBRAL_SENAL_DEBIL_DBM/UMBRAL_TEMPERATURA_ALTA_C en
+// routes/olts.ts) para no duplicar esos umbrales en el frontend.
+export interface OntPuertoConsulta {
+  id: number;
+  onuIndex: number;
+  serial: string;
+  estado: "ONLINE" | "OFFLINE";
+  rxPowerDbm: string | null;
+  txPowerDbm: string | null;
+  temperaturaCelsius: string | null;
+  distanciaMetros: number | null;
+  ipGestion: string | null;
+  cliente: { id: number; razonSocial: string; identificacion: string } | null;
+  alerta: boolean;
+}
+
+// Respuesta de POST /olts/:id/puertos/consultar (Vista por puerto GPON, ver
+// VistaPuertoOlt.tsx) — trae por SSH el estado completo de un puerto puntual
+// para saber de un vistazo si se cayó el puerto entero o solo algunos ONT.
+export interface ConsultaPuertoOlt {
+  frame: number;
+  slot: number;
+  puerto: number;
+  totales: { total: number; enLinea: number; desconectadas: number; conAlertas: number };
+  todoElPuertoCaido: boolean;
+  onts: OntPuertoConsulta[];
+}
+
+// Bitácora de transiciones detectadas por el polling (alta/baja, online/
+// offline) — ver GET /olts/:id/eventos.
+export interface OltEvento {
+  id: number;
+  oltId: number;
+  oltOnuId?: number | null;
+  oltOnu?: { id: number; serial: string; slot: number; puerto: number; onuIndex: number } | null;
+  tipo: string;
+  mensaje?: string | null;
+  fecha: string;
+}
+
+// Respuesta de POST /olts/:id/sincronizar
+export interface ResultadoSincronizacionOlt {
+  totalDetectadas: number;
+  nuevas: number;
+  actualizadas: number;
+  desaparecidas: number;
+}
+
+// Respuesta de POST /olts/:id/explorar-oid — herramienta de calibración, ver
+// utils/oltHuawei.ts.
+export interface ResultadoExplorarOid {
+  total: number;
+  filas: { oid: string; tipo?: number; valor: string }[];
+  truncado: boolean;
+}
+
+// Switch TP-Link instalado en el domicilio de un cliente (ver SwitchCliente
+// en schema.prisma) — a diferencia de la OLT, uno por cliente, 1 a 1.
+// snmpComunidad/snmpAuthPassword/snmpPrivPassword nunca vuelven del backend.
+export interface SwitchCliente {
+  id: number;
+  clienteId: number;
+  cliente?: { id: number; razonSocial: string; identificacion: string };
+  direccionIp: string;
+  modelo?: string | null;
+  cantidadPuertos: number;
+  snmpPuerto: number;
+  snmpVersion: string;
+  snmpUsuario?: string | null;
+  snmpAuthProtocolo?: string | null;
+  snmpPrivProtocolo?: string | null;
+  ultimaConexionExitosa?: string | null;
+  activo?: boolean;
+  createdAt?: string;
+  puertos?: SwitchPuerto[];
+}
+
+// Estado cacheado de un puerto — ver GET /switches (viene incluido) y POST
+// /switches/:id/sincronizar (lo recalcula). poeEstado: "DELIVERING_POWER" |
+// "SEARCHING" | "FAULT" | "DISABLED" | null — ver advertencia sobre vataje
+// en backend/src/utils/switchTpLink.ts (no es un dato confiable por SNMP
+// estándar entre fabricantes, solo el estado categórico).
+export interface SwitchPuerto {
+  id: number;
+  switchId: number;
+  numeroPuerto: number;
+  estado?: string | null; // "UP" | "DOWN" | null = todavía no sincronizado
+  velocidadMbps?: number | null;
+  trafficEntradaBps?: number | null;
+  trafficSalidaBps?: number | null;
+  poeEstado?: string | null;
+  ultimaLectura?: string | null;
+}
+
+// Bitácora de transiciones UP/DOWN de un puerto — ver GET /switches/:id/eventos.
+export interface SwitchEvento {
+  id: number;
+  switchId: number;
+  switchPuertoId?: number | null;
+  switchPuerto?: { id: number; numeroPuerto: number } | null;
+  tipo: string;
+  mensaje?: string | null;
+  fecha: string;
+}
+
+// Respuesta de POST /switches/:id/sincronizar
+export interface ResultadoSincronizacionSwitch {
+  totalPuertos: number;
+  puertosUp: number;
+  puertosDown: number;
+  transiciones: number;
+}
+
+// Estado de conexión calculado para un cliente en el Mapa de Red — ver
+// backend/src/utils/estadoRedCliente.ts para la lógica de prioridad entre
+// señales (ping, ONU/OLT, nodo). "OK" y "SIN_DATOS" no son alertas; el resto
+// sí (ver MapaRedPage.tsx para el color/orden de severidad).
+export type EstadoRedCliente = "OK" | "SENAL_DEBIL" | "LATENCIA_ALTA" | "INESTABLE" | "SIN_RESPUESTA" | "ONU_OFFLINE" | "NODO_CAIDO" | "SIN_DATOS";
+
+// Fila de GET /mapa-red/clientes — un cliente con ubicación, listo para
+// pintar en el mapa. latitud/longitud llegan como string (Decimal, ver
+// convención del archivo) — se convierten a number recién al pasarlos a Leaflet.
+export interface ClienteMapaRed {
+  id: number;
+  razonSocial: string;
+  identificacion: string;
+  direccionIp?: string | null;
+  latitud: string;
+  longitud: string;
+  estado: EstadoRedCliente;
+  detalle: string;
+  pingMs?: number | null;
+  pingUltimaMedicion?: string | null;
+  onu?: { serial: string; estado: string | null; rxPowerDbm: string | null } | null;
+  nodo?: { id: number; nombre: string } | null;
+}
+
+// Respuesta de POST /visitas/urgente — agenda una visita prioritaria para
+// HOY, creando la ruta del técnico si todavía no la tenía (ver
+// FormularioVisitaUrgente.tsx, disparado desde el Mapa de Red al notar un
+// cliente caído).
+export interface RespuestaVisitaUrgente {
+  visita: VisitaTecnica;
+  rutaId: number;
+  rutaCreada: boolean;
 }
 
 // Catálogo de planes de internet contratables por un Cliente del ISP — ver
@@ -463,6 +777,37 @@ export interface ClienteFacturableInternet extends Cliente {
     total: string;
     ultimaFecha: string;
   } | null;
+  // Vista previa de la promoción (ver PromocionPlan) que le tocaría a este
+  // cliente SI se factura hoy — informativa, el cálculo real se repite al
+  // momento de facturar de verdad (ver POST /facturas-internet/:clienteId).
+  promocionAplicable: {
+    id: number;
+    nombre: string;
+    porcentajeDescuento: string;
+    precioConDescuento: string;
+  } | null;
+}
+
+// Alcance de una PromocionPlan — ver backend/prisma/schema.prisma.
+export type AlcancePromocion = "TODOS_LOS_CLIENTES" | "CLIENTES_NUEVOS";
+
+// Descuento temporal sobre la facturación de internet (ver
+// PromocionesPage.tsx) — nunca toca PlanInternet.precio, solo resta un % al
+// momento puntual de facturar (ver routes/facturasInternet.ts).
+export interface PromocionPlan {
+  id: number;
+  nombre: string;
+  porcentajeDescuento: string;
+  fechaInicio: string;
+  fechaFin: string | null;
+  alcance: AlcancePromocion;
+  // Solo tiene valor si alcance = CLIENTES_NUEVOS.
+  mesesDesdeContrato: number | null;
+  // null = aplica a cualquier plan de internet.
+  planInternetId: number | null;
+  planInternet?: { id: number; nombre: string } | null;
+  activo: boolean;
+  createdAt: string;
 }
 
 // Un abono contra una Factura (cuenta por cobrar) o una Compra (cuenta por
@@ -830,10 +1175,12 @@ export interface PendienteSerie {
 // Un número de serie individual de una unidad de un producto serializado —
 // nace EN_BODEGA al capturarlo contra una compra, pasa a ENTREGADO al
 // vincularlo a un cliente (ver POST /productos/series/:id/entregar).
+export type EstadoNumeroSerie = "EN_BODEGA" | "EN_TRANSITO" | "ENTREGADO";
+
 export interface NumeroSerieProducto {
   id: number;
   numeroSerie: string;
-  estado: "EN_BODEGA" | "ENTREGADO";
+  estado: EstadoNumeroSerie;
   fechaEntrega: string | null;
   referenciaDocumento: string | null;
   createdAt: string;
@@ -842,6 +1189,9 @@ export interface NumeroSerieProducto {
   compraDetalle: {
     compra: { id: number; numeroFactura: string; fechaEmision: string; proveedor: { razonSocial: string } };
   } | null;
+  // Quién lo tiene en mano ahora mismo — solo viene con datos cuando estado
+  // = EN_TRANSITO (ver EgresoBodega, GET /productos/series/buscar).
+  egresosDetalle?: { id: number; egreso: { id: number; empleado: { id: number; nombres: string; apellidos: string } } }[];
 }
 
 // El espejo de NotaCredito, pero del lado de compras — registro interno
@@ -1012,8 +1362,8 @@ export interface HorasTrabajadas {
 }
 
 // Un ítem dejado en la vivienda durante la visita (ver PATCH
-// /visitas/:id/detalle-trabajo) — a propósito no está vinculado a
-// Producto/stock, es solo el acta de lo que el técnico dice que dejó.
+// /visitas/:id/detalle-trabajo) — sigue sin ser un movimiento de inventario
+// formal, es el acta de lo que el técnico dice que dejó.
 export interface EquipoDejadoVisita {
   id: number;
   visitaId: number;
@@ -1021,6 +1371,74 @@ export interface EquipoDejadoVisita {
   modelo: string | null;
   // Para equipos de red, en la práctica es la dirección MAC.
   serial: string | null;
+  // Solo tiene valor si el serial se eligió del catálogo real (ver
+  // ProductoCatalogoEquipo/SerieDisponibleCatalogo abajo) — permite marcar
+  // ese número de serie ENTREGADO al guardar y devolverlo a bodega si se
+  // quita del acta después. null si se tipeó a mano.
+  numeroSerieProductoId: number | null;
+  // Igual criterio: solo tiene valor si el técnico eligió descontar metros
+  // de uno de SUS rollos asignados (ver RolloMetrajeDisponible/GET
+  // /metraje/mis-rollos) — metrosUsados siempre va junto.
+  asignacionMetrajeId?: number | null;
+  metrosUsados?: number | null;
+}
+
+// Insumo consumido en el trabajo que no es un equipo identificable (cinta,
+// canaleta, conectores, etc.) — ver MaterialUtilizadoVisita en schema.prisma.
+export interface MaterialUtilizadoVisita {
+  id: number;
+  visitaId: number;
+  descripcion: string;
+  cantidad: number;
+  unidad: string;
+}
+
+export type TipoTrabajoVisita = "INSTALACION_NUEVA" | "MEJORA_EXISTENTE";
+
+// Respuesta de GET /metraje/mis-rollos — rollos de cable que el técnico
+// logueado tiene activos, con metros disponibles, para elegir en el acta de
+// una visita (ver DetalleTrabajoVisita.tsx).
+export interface RolloMetrajeDisponible {
+  id: number;
+  producto: { id: number; nombre: string; codigo: string };
+  metrosIniciales: number;
+  metrosRestantes: number;
+}
+
+// Respuesta de GET /metraje/asignaciones (vista admin) — el historial
+// completo, activas o no, ver MetrajePage.tsx.
+export interface AsignacionMetraje {
+  id: number;
+  producto: { id: number; nombre: string; codigo: string; unidadMedida: string };
+  empleado: { id: number; nombres: string; apellidos: string };
+  bodega: { id: number; nombre: string };
+  metrosIniciales: number;
+  metrosRestantes: number;
+  activo: boolean;
+  createdAt: string;
+  // Cuadre al cerrar con conteo físico — null si se cerró sin contar.
+  metrosDevueltosFisicos?: number | null;
+  metrosFaltantes?: number | null;
+}
+
+// Respuesta de GET /visitas/catalogo-equipos — catálogo real de productos
+// (no servicios) para que el técnico elija el equipo dejado en vez de
+// tipearlo a mano (ver DetalleTrabajoVisita.tsx). El acta sigue guardando
+// texto libre (EquipoDejadoVisita no tiene FK a Producto, a propósito), esto
+// solo alimenta los selects para evitar errores de tipeo.
+export interface ProductoCatalogoEquipo {
+  id: number;
+  nombre: string;
+  marca: string | null;
+  modelo: string | null;
+  controlaNumeroSerie: boolean;
+}
+
+// Respuesta de GET /visitas/catalogo-equipos/:productoId/series — números de
+// serie EN_BODEGA de ese producto, para el select de "Serial / MAC".
+export interface SerieDisponibleCatalogo {
+  id: number;
+  numeroSerie: string;
 }
 
 export interface VisitaTecnica {
@@ -1030,6 +1448,11 @@ export interface VisitaTecnica {
   cliente: Cliente | null;
   nombreContacto: string;
   direccion: string | null;
+  // Qué debe hacer el técnico acá, definido por quien armó la ruta (ej.
+  // "Revisión de equipos", "Fibra óptica rota") — ver comentario del modelo
+  // en schema.prisma. Distinto de descripcionTrabajo (lo que se reportó
+  // después) y de observaciones (por qué se omitió, si aplica).
+  motivoVisita: string | null;
   latitud: string;
   longitud: string;
   orden: number;
@@ -1049,6 +1472,10 @@ export interface VisitaTecnica {
   fotoTrabajoUrl?: string | null;
   fotoViviendaUrl?: string | null;
   equiposDejados?: EquipoDejadoVisita[];
+  // Si esta visita fue una instalación nueva o una mejora a un cliente ya
+  // existente — lo indica el técnico al llenar el acta, opcional.
+  tipoTrabajo?: TipoTrabajoVisita | null;
+  materialesUtilizados?: MaterialUtilizadoVisita[];
 }
 
 export interface RutaVisita {
@@ -1085,6 +1512,7 @@ export interface VisitaHistorialCliente {
   rutaVisitaId: number;
   nombreContacto: string;
   direccion: string | null;
+  motivoVisita: string | null;
   latitud: string;
   longitud: string;
   orden: number;
@@ -1112,6 +1540,7 @@ export interface VisitaHistorialTecnico {
   cliente: Cliente | null;
   nombreContacto: string;
   direccion: string | null;
+  motivoVisita: string | null;
   latitud: string;
   longitud: string;
   orden: number;
@@ -1608,4 +2037,550 @@ export interface CodigosSri {
   tipoIdentificacion: Record<string, string>;
   formaPago: Record<string, string>;
   porcentajeIva: Record<string, string>;
+}
+
+// --- Vehículos (flota de la empresa) ---
+// Ver el comentario del módulo en backend/prisma/schema.prisma.
+
+// Catálogo de marca/modelo — se elige de una lista en vez de escribirlo a
+// mano (ver backend/prisma/schema.prisma, MarcaVehiculo/ModeloVehiculo).
+export interface MarcaVehiculo {
+  id: number;
+  nombre: string;
+  activo?: boolean;
+  createdAt?: string;
+}
+
+export interface ModeloVehiculo {
+  id: number;
+  marcaId: number;
+  nombre: string;
+  activo?: boolean;
+  createdAt?: string;
+}
+
+export interface Vehiculo {
+  id: number;
+  placa: string;
+  marcaId: number;
+  marca: { id: number; nombre: string };
+  modeloId: number;
+  modelo: { id: number; nombre: string };
+  anio?: number | null;
+  color?: string | null;
+  sucursalId: number | null;
+  sucursal: { id: number; nombre: string } | null;
+  // Caché del mayor kilometraje registrado entre sus cargas de combustible,
+  // mantenimientos y usos diarios — null si todavía no se registró ninguno
+  // (ver backend/src/utils/vehiculos.ts).
+  kilometrajeActual: number | null;
+  activo: boolean;
+  createdAt: string;
+  // Uso diario EN_USO ahora mismo (si alguien lo tiene) — arreglo de 0 o 1
+  // elemento, ver "usos" en backend/src/routes/vehiculos.ts (SELECT_VEHICULO).
+  usos: { id: number; empleado: { id: number; nombres: string; apellidos: string }; kilometrajeInicial: number; fechaInicio: string }[];
+}
+
+export type EstadoUsoVehiculo = "EN_USO" | "FINALIZADO";
+
+// Un día de uso de un vehículo por un técnico — abre con el kilometraje
+// inicial y cierra con el final, mismo patrón que CajaSesion pero para un
+// vehículo (ver backend/prisma/schema.prisma, UsoVehiculo). Reemplaza el
+// viejo concepto de "responsable fijo": cualquier técnico puede tomar
+// cualquier vehículo libre cualquier día.
+export interface UsoVehiculo {
+  id: number;
+  vehiculoId: number;
+  vehiculo: { id: number; placa: string; marca: { nombre: string }; modelo: { nombre: string } };
+  empleadoId: number;
+  empleado: { id: number; nombres: string; apellidos: string };
+  kilometrajeInicial: number;
+  fechaInicio: string;
+  kilometrajeFinal: number | null;
+  fechaFin: string | null;
+  estado: EstadoUsoVehiculo;
+  observaciones?: string | null;
+  // Control de entrega del vehículo (ver POST /vehiculos/uso/abrir) — todos
+  // opcionales, texto libre, cargados solo al empezar el día.
+  golpesCarroceria?: string | null;
+  vidrios?: string | null;
+  llantas?: string | null;
+  lucesVisibles?: string | null;
+  accesorios?: string | null;
+  llaves?: string | null;
+  documentacion?: string | null;
+  equiposHerramientas?: string | null;
+  createdAt: string;
+}
+
+export interface CargaCombustible {
+  id: number;
+  vehiculoId: number;
+  fecha: string;
+  kilometraje: number;
+  tipoCombustible: string;
+  galones: string;
+  costoTotal: string;
+  gasolinera?: string | null;
+  observaciones?: string | null;
+  // Foto del comprobante de pago (factura/ticket de la gasolinera) — ruta
+  // relativa, completar con urlArchivoSubido() para mostrarla o enlazarla.
+  // null = no se adjuntó ninguna al registrar la carga.
+  comprobanteUrl?: string | null;
+  usuario: { id: number; nombre: string } | null;
+  createdAt: string;
+}
+
+export type TipoMantenimientoVehiculo =
+  | "CAMBIO_ACEITE"
+  | "CAMBIO_FILTRO_ACEITE"
+  | "CAMBIO_FILTRO_AIRE"
+  | "CAMBIO_PASTILLAS_FRENO"
+  | "CAMBIO_LLANTAS"
+  | "ALINEACION_BALANCEO"
+  | "REVISION_GENERAL"
+  | "OTRO";
+
+// Etiquetas legibles para el select/tabla — ver TIPOS_MANTENIMIENTO en
+// backend/src/routes/vehiculos.ts (misma lista, mismo orden).
+export const ETIQUETAS_MANTENIMIENTO_VEHICULO: Record<TipoMantenimientoVehiculo, string> = {
+  CAMBIO_ACEITE: "Cambio de aceite",
+  CAMBIO_FILTRO_ACEITE: "Cambio de filtro de aceite",
+  CAMBIO_FILTRO_AIRE: "Cambio de filtro de aire",
+  CAMBIO_PASTILLAS_FRENO: "Cambio de pastillas de freno",
+  CAMBIO_LLANTAS: "Cambio de llantas",
+  ALINEACION_BALANCEO: "Alineación y balanceo",
+  REVISION_GENERAL: "Revisión general",
+  OTRO: "Otro",
+};
+
+export interface MantenimientoVehiculo {
+  id: number;
+  vehiculoId: number;
+  tipo: TipoMantenimientoVehiculo;
+  fecha: string;
+  kilometraje: number;
+  costo: string | null;
+  taller?: string | null;
+  descripcion?: string | null;
+  proximoKilometraje: number | null;
+  // Respaldo de que se hizo — mismo criterio que CargaCombustible.comprobanteUrl.
+  numeroFactura?: string | null;
+  comprobanteUrl?: string | null;
+  usuario: { id: number; nombre: string } | null;
+  createdAt: string;
+}
+
+// Regla de mantenimiento preventivo por vehículo ("cada X km toca este
+// tipo, avisar cuando falten Y") — ver el comentario del modelo en
+// backend/prisma/schema.prisma. Hace que MantenimientoVehiculo.
+// proximoKilometraje se calcule solo al registrar el siguiente mantenimiento
+// de ese tipo, en vez de escribirlo a mano cada vez.
+export interface PlanMantenimientoVehiculo {
+  id: number;
+  vehiculoId: number;
+  tipo: TipoMantenimientoVehiculo;
+  intervaloKm: number;
+  kmAvisoPrevio: number;
+  activo?: boolean;
+  createdAt?: string;
+}
+
+// Fila de GET /vehiculos/alertas-mantenimiento — solo trae los que ya están
+// vencidos o por vencer (dentro de kmAvisoPrevio), pensado para un banner
+// de avisos, no para el estado de todos los vehículos.
+export interface AlertaMantenimientoVehiculo {
+  vehiculoId: number;
+  placa: string;
+  marca: string;
+  modelo: string;
+  tipo: TipoMantenimientoVehiculo;
+  kilometrajeActual: number | null;
+  proximoKilometraje: number;
+  kmRestantes: number;
+  estado: "VENCIDO" | "PROXIMO";
+}
+
+// Respuesta de GET /vehiculos/:id/reporte?desde=&hasta= — resumen de todo lo
+// que pasó con un vehículo en un rango de fechas (cargas, mantenimientos,
+// usos diarios) más el detalle día por día, para VehiculosPage.tsx.
+export interface TecnicoEncargadoVehiculo {
+  empleadoId: number;
+  nombre: string;
+  diasUso: number;
+  kmRecorridos: number;
+}
+
+export interface ReporteVehiculo {
+  vehiculo: Vehiculo;
+  rango: { desde: string | null; hasta: string | null };
+  resumen: {
+    kmRecorridos: number;
+    cantidadCargas: number;
+    totalGalones: string;
+    totalCombustible: string;
+    cantidadMantenimientos: number;
+    totalMantenimiento: string;
+    diasUso: number;
+    cantidadTecnicos: number;
+  };
+  tecnicos: TecnicoEncargadoVehiculo[];
+  cargasCombustible: CargaCombustible[];
+  mantenimientos: MantenimientoVehiculo[];
+  usos: UsoVehiculo[];
+}
+
+// Fila de GET /vehiculos/reporte-combustible, agrupada por agencia (sucursal
+// del vehículo) o por técnico — ver ReporteCombustibleFlota más abajo.
+export interface GastoCombustiblePorAgencia {
+  sucursalId: number | null;
+  nombre: string;
+  cantidadCargas: number;
+  totalGalones: string;
+  totalCombustible: string;
+}
+
+export interface GastoCombustiblePorTecnico {
+  empleadoId: number | null;
+  nombre: string; // "Sin técnico asignado" cuando la carga no cae dentro de ningún Uso de Vehículo
+  cantidadCargas: number;
+  totalGalones: string;
+  totalCombustible: string;
+  // Suma de los "kmRecorridos" (ver CargaCombustibleFlota) de las cargas
+  // atribuidas a este técnico — NUNCA el kmRecorridos de ReporteVehiculo
+  // (ese sale de UsoVehiculo.kilometrajeFinal-Inicial, un cálculo distinto).
+  kmRecorridos: number;
+}
+
+// Fila de "cargas" en GET /vehiculos/reporte-combustible — versión acotada
+// de CargaCombustible con el vehículo/agencia ya incluidos, para la tabla
+// de detalle del reporte de flota (no reemplaza CargaCombustible, que sigue
+// siendo la fuente completa por vehículo puntual).
+export interface CargaCombustibleFlota {
+  id: number;
+  fecha: string;
+  galones: string;
+  costoTotal: string;
+  gasolinera: string | null;
+  vehiculo: { id: number; placa: string; sucursal: { id: number; nombre: string } | null };
+  // Km recorridos con el tanque de ESTA carga (diferencia de kilometraje
+  // contra la carga anterior del mismo vehículo) y el rendimiento (km por
+  // galón) que salió de ella — ambos null en la primera carga registrada de
+  // ese vehículo, o si el odómetro no avanzó respecto a la anterior.
+  kmRecorridos: number | null;
+  rendimiento: string | null;
+}
+
+// Fila de "porVehiculo" en GET /vehiculos/reporte-combustible — a
+// diferencia de porAgencia/porTecnico (ordenadas por gasto, de mayor a
+// menor), esta viene ordenada por RENDIMIENTO ascendente (la unidad que
+// menos km por galón dio primero), pensada para detectar de un vistazo
+// cuál vehículo rinde peor. "rendimiento" es null cuando no hay ningún
+// delta de kilometraje calculable en el período (ver CargaCombustibleFlota).
+export interface GastoCombustiblePorVehiculo {
+  vehiculoId: number;
+  placa: string;
+  cantidadCargas: number;
+  totalGalones: string;
+  totalCombustible: string;
+  kmRecorridos: number;
+  rendimiento: string | null;
+}
+
+// Respuesta de GET /vehiculos/reporte-combustible?desde=&hasta=&sucursalId=
+// — panorama de gasto de combustible de TODA la flota (a diferencia de
+// ReporteVehiculo, que es por un solo vehículo), para
+// ReporteCombustiblePage.tsx.
+export interface ReporteCombustibleFlota {
+  rango: { desde: string | null; hasta: string | null };
+  resumen: {
+    cantidadCargas: number;
+    totalGalones: string;
+    totalCombustible: string;
+    cantidadVehiculos: number;
+  };
+  porAgencia: GastoCombustiblePorAgencia[];
+  porTecnico: GastoCombustiblePorTecnico[];
+  porVehiculo: GastoCombustiblePorVehiculo[];
+  cargas: CargaCombustibleFlota[];
+}
+
+// --- Localización de técnicos ---
+// Ver el comentario del módulo en backend/prisma/schema.prisma
+// (UbicacionTecnico) — historial append-only de posiciones GPS del celular
+// de cada técnico, capturadas por la app móvil cada ~2 min mientras la
+// tiene abierta (ver hooks/useUbicacionTecnico.ts).
+
+export type EstadoUbicacionTecnico = "EN_LINEA" | "RECIENTE" | "DESCONECTADO" | "SIN_DATOS";
+
+// Fila de GET /ubicaciones-tecnicos/actual — la última posición conocida de
+// cada técnico que alguna vez reportó una, más el vehículo que tiene EN_USO
+// ahora mismo (si tiene uno, ver UsoVehiculo) para poder responder también
+// "dónde está el vehículo X".
+export interface UbicacionActualTecnico {
+  empleadoId: number;
+  nombre: string;
+  latitud: string;
+  longitud: string;
+  precisionMetros: string | null;
+  fecha: string;
+  minutos: number;
+  estado: EstadoUbicacionTecnico;
+  vehiculo: { id: number; placa: string; marca: { nombre: string }; modelo: { nombre: string } } | null;
+}
+
+// Punto de GET /ubicaciones-tecnicos/:empleadoId/recorrido — para dibujar la
+// línea del recorrido del día de un técnico puntual.
+export interface PuntoRecorridoTecnico {
+  latitud: string;
+  longitud: string;
+  precisionMetros: string | null;
+  fecha: string;
+}
+
+// --- Egresos de bodega (despacho de equipos serializados a un técnico) ---
+// Ver el comentario del módulo en backend/prisma/schema.prisma
+// (EgresoBodega/EgresoBodegaDetalle) — el documento que cierra la brecha
+// entre "el equipo está en bodega" y "quedó entregado a un cliente".
+
+export type EstadoEgresoBodegaDetalle = "EN_TRANSITO" | "ENTREGADO" | "DEVUELTO";
+
+export interface EgresoBodegaDetalle {
+  id: number;
+  estado: EstadoEgresoBodegaDetalle;
+  createdAt: string;
+  numeroSerieProducto: {
+    id: number;
+    numeroSerie: string;
+    estado: EstadoNumeroSerie;
+    clienteId: number | null;
+    cliente: { id: number; razonSocial: string } | null;
+    producto: { id: number; nombre: string; marca: string | null; modelo: string | null };
+  };
+}
+
+export interface EgresoBodega {
+  id: number;
+  empleado: { id: number; nombres: string; apellidos: string };
+  clienteDestino: { id: number; razonSocial: string; identificacion: string } | null;
+  usuario: { id: number; nombre: string } | null;
+  observaciones: string | null;
+  createdAt: string;
+  detalles: EgresoBodegaDetalle[];
+}
+
+// Fila de GET /egresos-bodega/mis-pendientes — lo que el técnico logueado
+// tiene en mano ahora mismo, de cualquier egreso.
+export interface EgresoPendienteTecnico {
+  id: number; // id del EgresoBodegaDetalle
+  createdAt: string;
+  egreso: { id: number; clienteDestino: { id: number; razonSocial: string } | null };
+  numeroSerieProducto: {
+    id: number;
+    numeroSerie: string;
+    producto: { id: number; nombre: string; marca: string | null; modelo: string | null };
+  };
+}
+
+// ===========================================================================
+// Centro de Control (backend/src/routes/centroControl.ts)
+// ===========================================================================
+
+export interface AlertaRed {
+  id: number;
+  tipo: "CORTE_MASIVO" | "SENAL_DEGRADADA";
+  olt: { id: number; nombre: string };
+  slot: number;
+  puerto: number;
+  cantidadAfectadas: number;
+  mensaje: string;
+  fechaInicio: string;
+  fechaFin: string | null;
+  cerradaManualmente: boolean;
+  cantidadTickets: number;
+  onu: {
+    id: number;
+    serial: string;
+    onuIndex: number;
+    rxPowerDbm: string | null;
+    estado: string | null;
+    cliente: { id: number; razonSocial: string; telefono: string | null } | null;
+  } | null;
+  clientesAfectados: { id: number; razonSocial: string; telefono: string | null; estadoOnu: string | null }[];
+}
+
+export interface OnuPeorSenal {
+  id: number;
+  slot: number;
+  puerto: number;
+  onuIndex: number;
+  serial: string;
+  rxPowerDbm: string;
+  olt: { nombre: string };
+  cliente: { id: number; razonSocial: string } | null;
+}
+
+export interface LecturaSenal {
+  fecha: string;
+  rxPowerDbm: string;
+}
+
+export interface VisitasSospechosas {
+  umbralMetros: number;
+  totalVisitas: number;
+  porTecnico: { empleadoId: number; nombre: string; visitas: number; sospechosas: number }[];
+  sospechosas: {
+    visitaId: number;
+    fechaLlegadaReal: string;
+    tecnico: string;
+    empleadoId: number;
+    nombreContacto: string;
+    cliente: { id: number; razonSocial: string } | null;
+    motivoVisita: string | null;
+    distanciaAlPunto: number | null;
+    distanciaRastroMetros: number | null;
+    motivos: string[];
+  }[];
+}
+
+export interface CuadreTecnicos {
+  promedioGeneralMetrosPorInstalacion: number | null;
+  tecnicos: {
+    empleadoId: number;
+    nombre: string;
+    equiposEnMano: { detalleId: number; numeroSerieProductoId: number; producto: string; numeroSerie: string; dias: number }[];
+    equiposMasDe7Dias: number;
+    rollosActivos: { id: number; producto: string; metrosIniciales: number; metrosRestantes: number; dias: number }[];
+    metrosFaltantes: number;
+    valorFaltante: string;
+    instalaciones90Dias: number;
+    promedioMetrosPorInstalacion: number | null;
+    consumoAlto: boolean;
+  }[];
+}
+
+interface ClienteDeBaja {
+  id: number;
+  razonSocial: string;
+  telefono: string | null;
+  direccion: string | null;
+  fechaBaja: string | null;
+}
+
+export interface EquiposNoRecuperados {
+  valorEstimado: string;
+  conSerie: {
+    numeroSerieProductoId: number;
+    producto: string;
+    numeroSerie: string;
+    costo: string | null;
+    fechaEntrega: string | null;
+    cliente: ClienteDeBaja;
+  }[];
+  textoLibre: { id: number; tipo: string; modelo: string | null; serial: string | null; fechaInstalacion: string; cliente: ClienteDeBaja | null }[];
+}
+
+export interface AnomaliaCombustible {
+  cargaId: number;
+  fecha: string;
+  placa: string;
+  kilometraje: number;
+  galones: string;
+  costoTotal: string;
+  gasolinera: string | null;
+  registradoPor: string | null;
+  motivo: string;
+  rendimiento: string | null;
+  rendimientoMediano: string | null;
+}
+
+export interface IndicadoresIsp {
+  clientesActivos: number;
+  ingresoMensualRecurrente: string;
+  arpu: string;
+  porPlan: { plan: string; clientes: number; ingreso: string }[];
+  meses: { mes: string; activosAlInicio: number; altas: number; bajas: number; churnPorcentaje: number | null }[];
+  motivosBaja: { motivo: string; cantidad: number }[];
+  morosidad: {
+    evaluados: number;
+    alDia: number;
+    pendientesDentroDePlazo: number;
+    morosos: number;
+    porcentaje: number;
+    montoMoroso: string;
+    detalle: { id: number; razonSocial: string; telefono: string | null; plan: string; monto: string; diasAtraso: number; enProrroga: boolean }[];
+  };
+  suspensionesRepetidas: { id: number; razonSocial: string; telefono: string | null; activo: boolean; suspensiones: number }[];
+  historialSuspensionesDesde: string | null;
+}
+
+export interface ResumenEncuestas {
+  enviadas: number;
+  respondidas: number;
+  promedio: number | null;
+  porTecnico: { empleadoId: number; nombre: string; enviadas: number; respondidas: number; calificacionesBajas: number; promedio: number | null }[];
+  encuestas: {
+    id: number;
+    enviadaEn: string;
+    calificacion: number | null;
+    comentario: string | null;
+    respondidaEn: string | null;
+    visitaId: number;
+    cliente: string;
+    motivoVisita: string | null;
+    tecnico: string;
+  }[];
+}
+
+// ===========================================================================
+// Tickets de soporte (backend/src/routes/tickets.ts)
+// ===========================================================================
+
+export type EstadoTicket = "ABIERTO" | "EN_PROCESO" | "RESUELTO" | "CANCELADO";
+export type PrioridadTicket = "BAJA" | "MEDIA" | "ALTA";
+
+export interface TicketSoporte {
+  id: number;
+  clienteId: number | null;
+  cliente: { id: number; razonSocial: string; telefono: string | null; direccion: string | null } | null;
+  nombreContacto: string;
+  telefono: string | null;
+  canal: "WHATSAPP" | "LLAMADA" | "PRESENCIAL" | "SISTEMA";
+  categoria: string;
+  prioridad: PrioridadTicket;
+  asunto: string;
+  estado: EstadoTicket;
+  asignadoEmpleadoId: number | null;
+  asignadoEmpleado: { id: number; nombres: string; apellidos: string } | null;
+  visitaTecnica: { id: number; estado: string; fechaLlegadaReal: string | null; rutaVisita: { fecha: string } } | null;
+  alertaRed: { id: number; tipo: string; mensaje: string; fechaFin: string | null } | null;
+  creadoPorUsuario: { id: number; nombre: string } | null;
+  solucion: string | null;
+  createdAt: string;
+  fechaPrimeraAtencion: string | null;
+  fechaResolucion: string | null;
+  sla: { horasTranscurridas: number; horasLimite: number; vencido: boolean };
+  _count?: { mensajes: number };
+}
+
+export interface MensajeTicket {
+  id: number;
+  autor: "CLIENTE" | "USUARIO" | "SISTEMA";
+  texto: string;
+  createdAt: string;
+  usuario: { nombre: string } | null;
+}
+
+export interface TicketDetalle extends TicketSoporte {
+  mensajes: MensajeTicket[];
+  puedeResponderWhatsapp: boolean;
+}
+
+export interface ResumenTickets {
+  abiertos: number;
+  enProceso: number;
+  vencidos: number;
+  resueltos30Dias: number;
+  porcentajeDentroSla30Dias: number | null;
+  porTecnico: { nombre: string; resueltos: number; horasPromedio: number; porcentajeDentroSla: number }[];
 }

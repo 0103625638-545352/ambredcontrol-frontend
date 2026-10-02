@@ -3,6 +3,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type CuentaBancaria } from "../api/client";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import {
+  CLASE_CAMPO,
+  CLASE_ETIQUETA,
+  CLASE_THEAD,
+  CLASE_CAMPO_CELDA,
+  CLASE_ACCION,
+  CLASE_ACCION_PELIGRO,
+  PanelListado,
+  FilaSinResultados,
+  Resaltar,
+} from "../components/FormatoDocumento";
 
 const TIPOS_CUENTA = ["AHORROS", "CORRIENTE"];
 
@@ -68,166 +80,221 @@ export function CuentasBancariasPage() {
     if (ok) desactivarCuentaBancaria.mutate(cb.id);
   }
 
+  // Buscador del catálogo (en el navegador: la lista ya viene completa).
+  const filtros = useFiltrosListado(sinPaginacion);
+  const cuentasFiltradas = filtrarLocal(cuentasBancarias, filtros, {
+    textos: (cb) => [cb.nombre, cb.banco, cb.numeroCuenta],
+    fecha: (cb) => cb.createdAt,
+    estado: (cb) => cb.tipoCuenta,
+  });
+
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Cuentas Bancarias</h2>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (formNuevo.nombre.trim() && formNuevo.banco.trim() && formNuevo.numeroCuenta.trim()) {
-            crearCuentaBancaria.mutate();
-          }
-        }}
-        className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 flex flex-wrap gap-3 max-w-3xl"
+      <PanelListado
+        titulo="Cuentas bancarias"
+        conteo={cuentasBancarias?.length}
+        singular="cuenta"
+        plural="cuentas"
+        aviso="Cuentas PROPIAS de la empresa. Se elige a cuál llegó el dinero al registrar un cobro por transferencia, tarjeta o cheque."
       >
-        <input
-          placeholder="Nombre (ej. Pichincha Corriente Principal)"
-          required
-          value={formNuevo.nombre}
-          onChange={(e) => setFormNuevo({ ...formNuevo, nombre: e.target.value })}
-          className="flex-1 min-w-[200px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <input
-          placeholder="Banco"
-          required
-          value={formNuevo.banco}
-          onChange={(e) => setFormNuevo({ ...formNuevo, banco: e.target.value })}
-          className="flex-1 min-w-[140px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <input
-          placeholder="Número de cuenta"
-          required
-          value={formNuevo.numeroCuenta}
-          onChange={(e) => setFormNuevo({ ...formNuevo, numeroCuenta: e.target.value })}
-          className="flex-1 min-w-[140px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-        />
-        <select
-          value={formNuevo.tipoCuenta}
-          onChange={(e) => setFormNuevo({ ...formNuevo, tipoCuenta: e.target.value })}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+        {/* Línea de ingreso: nueva cuenta */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            crearCuentaBancaria.mutate();
+          }}
+          className="flex flex-wrap items-end gap-2 p-3 border-b border-stone-300 dark:border-gray-700"
         >
-          {TIPOS_CUENTA.map((tipo) => (
-            <option key={tipo} value={tipo}>
-              {tipo === "AHORROS" ? "Ahorros" : "Corriente"}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          disabled={crearCuentaBancaria.isPending}
-          className="bg-brand-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50 whitespace-nowrap"
-        >
-          {crearCuentaBancaria.isPending ? "Guardando..." : "+ Agregar"}
-        </button>
-      </form>
+          <label className="flex flex-col gap-1 flex-[2_1_220px] min-w-0">
+            <span className={CLASE_ETIQUETA}>Nombre de la cuenta</span>
+            <input
+              placeholder="Ej: Pichincha Corriente Principal"
+              required
+              value={formNuevo.nombre}
+              onChange={(e) => setFormNuevo({ ...formNuevo, nombre: e.target.value })}
+              className={CLASE_CAMPO}
+            />
+          </label>
+          <label className="flex flex-col gap-1 flex-[1_1_150px] min-w-0">
+            <span className={CLASE_ETIQUETA}>Banco</span>
+            <input
+              placeholder="Banco"
+              required
+              value={formNuevo.banco}
+              onChange={(e) => setFormNuevo({ ...formNuevo, banco: e.target.value })}
+              className={CLASE_CAMPO}
+            />
+          </label>
+          <label className="flex flex-col gap-1 flex-[1_1_150px] min-w-0">
+            <span className={CLASE_ETIQUETA}>N° de cuenta</span>
+            <input
+              placeholder="Número de cuenta"
+              required
+              value={formNuevo.numeroCuenta}
+              onChange={(e) => setFormNuevo({ ...formNuevo, numeroCuenta: e.target.value })}
+              className={`${CLASE_CAMPO} font-mono`}
+            />
+          </label>
+          <label className="flex flex-col gap-1 w-32">
+            <span className={CLASE_ETIQUETA}>Tipo</span>
+            <select
+              value={formNuevo.tipoCuenta}
+              onChange={(e) => setFormNuevo({ ...formNuevo, tipoCuenta: e.target.value })}
+              className={CLASE_CAMPO}
+            >
+              {TIPOS_CUENTA.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo === "AHORROS" ? "Ahorros" : "Corriente"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={crearCuentaBancaria.isPending}
+            className="bg-brand-700 text-white px-4 py-1.5 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-50 whitespace-nowrap"
+          >
+            {crearCuentaBancaria.isPending ? "Guardando..." : "Agregar ↵"}
+          </button>
+        </form>
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden max-w-3xl">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
-            <tr>
-              <th className="px-4 py-2">Nombre</th>
-              <th className="px-4 py-2">Banco</th>
-              <th className="px-4 py-2">Número de cuenta</th>
-              <th className="px-4 py-2">Tipo</th>
-              <th className="px-4 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · nombre, banco o n° de cuenta"
+          placeholder="Ej: Pichincha, 2200..."
+          etiquetaEstado="Tipo"
+          opcionesEstado={[
+            { valor: "AHORROS", etiqueta: "Ahorros" },
+            { valor: "CORRIENTE", etiqueta: "Corriente" },
+          ]}
+          mostrarPago={false}
+        />
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className={CLASE_THEAD}>
               <tr>
-                <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Cargando...</td>
+                <th className="px-4 py-2 w-10">#</th>
+                <th className="px-4 py-2">Nombre</th>
+                <th className="px-4 py-2">Banco</th>
+                <th className="px-4 py-2">N° de cuenta</th>
+                <th className="px-4 py-2">Tipo</th>
+                <th className="px-4 py-2 w-40"></th>
               </tr>
-            )}
-            {!isLoading && cuentasBancarias?.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">Todavía no hay cuentas bancarias</td>
-              </tr>
-            )}
-            {cuentasBancarias?.map((cb) => (
-              <tr key={cb.id} className="border-t border-gray-100 dark:border-gray-700">
-                {cuentaEditandoId === cb.id ? (
-                  <td colSpan={5} className="px-4 py-2">
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        editarCuentaBancaria.mutate(cb.id);
-                      }}
-                      className="flex flex-wrap gap-2"
-                    >
-                      <input
-                        autoFocus
-                        required
-                        value={editForm.nombre}
-                        onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
-                        className="flex-1 min-w-[160px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <input
-                        required
-                        value={editForm.banco}
-                        onChange={(e) => setEditForm({ ...editForm, banco: e.target.value })}
-                        className="flex-1 min-w-[120px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <input
-                        required
-                        value={editForm.numeroCuenta}
-                        onChange={(e) => setEditForm({ ...editForm, numeroCuenta: e.target.value })}
-                        className="flex-1 min-w-[120px] border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      />
-                      <select
-                        value={editForm.tipoCuenta}
-                        onChange={(e) => setEditForm({ ...editForm, tipoCuenta: e.target.value })}
-                        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1 text-sm"
-                      >
-                        {TIPOS_CUENTA.map((tipo) => (
-                          <option key={tipo} value={tipo}>
-                            {tipo === "AHORROS" ? "Ahorros" : "Corriente"}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="submit"
-                        disabled={editarCuentaBancaria.isPending}
-                        className="bg-slate-800 text-white px-3 py-1 rounded-md text-xs font-medium hover:bg-slate-700 disabled:opacity-50"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCuentaEditandoId(null)}
-                        className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 px-3 py-1 rounded-md text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
-                      >
-                        Cancelar
-                      </button>
-                    </form>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-gray-400 dark:text-gray-500">
+                    Cargando...
                   </td>
-                ) : (
-                  <>
-                    <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">{cb.nombre}</td>
-                    <td className="px-4 py-2">{cb.banco}</td>
-                    <td className="px-4 py-2">{cb.numeroCuenta}</td>
-                    <td className="px-4 py-2">{cb.tipoCuenta === "AHORROS" ? "Ahorros" : "Corriente"}</td>
-                    <td className="px-4 py-2 text-right space-x-3">
-                      <button
-                        onClick={() => abrirEdicion(cb)}
-                        className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                </tr>
+              )}
+              {!isLoading && cuentasFiltradas?.length === 0 && (
+                <FilaSinResultados columnas={6} hayFiltros={filtros.hayFiltros} vacio="Todavía no hay cuentas bancarias." />
+              )}
+              {cuentasFiltradas?.map((cb, indice) => (
+                <tr key={cb.id} className="border-t border-stone-100 dark:border-gray-700 hover:bg-stone-50 dark:hover:bg-gray-700/30">
+                  {cuentaEditandoId === cb.id ? (
+                    <td colSpan={6} className="px-4 py-2">
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          editarCuentaBancaria.mutate(cb.id);
+                        }}
+                        className="flex flex-wrap gap-2"
                       >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => confirmarDesactivar(cb)}
-                        className="text-red-600 dark:text-red-400 hover:underline text-xs font-medium"
-                      >
-                        Desactivar
-                      </button>
+                        <input
+                          autoFocus
+                          required
+                          value={editForm.nombre}
+                          onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") setCuentaEditandoId(null);
+                          }}
+                          className={`${CLASE_CAMPO_CELDA} flex-1 min-w-40 text-left font-sans`}
+                        />
+                        <input
+                          required
+                          value={editForm.banco}
+                          onChange={(e) => setEditForm({ ...editForm, banco: e.target.value })}
+                          className={`${CLASE_CAMPO_CELDA} w-36 text-left font-sans`}
+                        />
+                        <input
+                          required
+                          value={editForm.numeroCuenta}
+                          onChange={(e) => setEditForm({ ...editForm, numeroCuenta: e.target.value })}
+                          className={`${CLASE_CAMPO_CELDA} w-36 text-left`}
+                        />
+                        <select
+                          value={editForm.tipoCuenta}
+                          onChange={(e) => setEditForm({ ...editForm, tipoCuenta: e.target.value })}
+                          className={`${CLASE_CAMPO_CELDA} w-28 text-left font-sans`}
+                        >
+                          {TIPOS_CUENTA.map((tipo) => (
+                            <option key={tipo} value={tipo}>
+                              {tipo === "AHORROS" ? "Ahorros" : "Corriente"}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="submit"
+                          disabled={editarCuentaBancaria.isPending}
+                          className="bg-brand-700 text-white px-3 py-1 rounded-sm text-xs font-semibold hover:bg-brand-800 disabled:opacity-50"
+                        >
+                          Guardar
+                        </button>
+                        <button type="button" onClick={() => setCuentaEditandoId(null)} className={CLASE_ACCION}>
+                          Cancelar
+                        </button>
+                      </form>
                     </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  ) : (
+                    <>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-400">{indice + 1}</td>
+                      <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">
+                        <Resaltar texto={cb.nombre} termino={filtros.busquedaAplicada} />
+                      </td>
+                      <td className="px-4 py-2">
+                        <Resaltar texto={cb.banco} termino={filtros.busquedaAplicada} />
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        <Resaltar texto={cb.numeroCuenta} termino={filtros.busquedaAplicada} />
+                      </td>
+                      <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        {cb.tipoCuenta === "AHORROS" ? "Ahorros" : "Corriente"}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex justify-end gap-3">
+                          <button onClick={() => abrirEdicion(cb)} className={CLASE_ACCION}>
+                            Editar
+                          </button>
+                          <button onClick={() => confirmarDesactivar(cb)} className={CLASE_ACCION_PELIGRO}>
+                            Desactivar
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Pie (como el de Facturas emitidas): cuántas cuentas hay en lo filtrado, por tipo */}
+        {cuentasFiltradas && cuentasFiltradas.length > 0 && (
+          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-4 py-2.5 border-t-2 border-gray-900 dark:border-gray-200">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {cuentasFiltradas.filter((cb) => cb.tipoCuenta === "AHORROS").length} ahorros ·{" "}
+              {cuentasFiltradas.filter((cb) => cb.tipoCuenta === "CORRIENTE").length} corriente
+              {filtros.hayFiltros ? " · según filtro" : ""}
+            </span>
+            <span className="text-sm font-bold text-gray-900 dark:text-gray-50">
+              CUENTAS <span className="font-mono tabular-nums ml-2">{cuentasFiltradas.length}</span>
+            </span>
+          </div>
+        )}
+      </PanelListado>
     </div>
   );
 }

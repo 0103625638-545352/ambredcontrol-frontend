@@ -42,7 +42,7 @@ export function FormularioCambiarPassword({ onExito, esCambioObligatorio }: Prop
   return (
     <form onSubmit={manejarSubmit} className="space-y-3">
       <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+        <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">
           {esCambioObligatorio ? "Contraseña temporal" : "Contraseña actual"}
         </label>
         <input
@@ -50,34 +50,34 @@ export function FormularioCambiarPassword({ onExito, esCambioObligatorio }: Prop
           required
           value={passwordActual}
           onChange={(e) => setPasswordActual(e.target.value)}
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Contraseña nueva</label>
+        <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Contraseña nueva</label>
         <input
           type="password"
           required
           value={passwordNueva}
           onChange={(e) => setPasswordNueva(e.target.value)}
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Confirmar contraseña nueva</label>
+        <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Confirmar contraseña nueva</label>
         <input
           type="password"
           required
           value={passwordConfirmar}
           onChange={(e) => setPasswordConfirmar(e.target.value)}
-          className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+          className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
         />
       </div>
       {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
       <button
         type="submit"
         disabled={cambiarPassword.isPending}
-        className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+        className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
       >
         {cambiarPassword.isPending ? "Guardando..." : "Cambiar contraseña"}
       </button>

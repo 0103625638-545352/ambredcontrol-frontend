@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { agregarCapasBase } from "../utils/capasMapaBase";
 
 interface Props {
   // Ubicación PLANEADA (la que el despachador ubicó a mano en el mapa al
@@ -33,10 +34,7 @@ export function MapaVisita({ latitudPlaneada, longitudPlaneada, radioPermitidoMe
       doubleClickZoom: false,
     }).setView([latitudPlaneada, longitudPlaneada], 16);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(mapa);
+    agregarCapasBase(mapa);
 
     // Punto planeado: azul, con un círculo del radio permitido alrededor
     // para visualizar el rango que cuenta como "llegó".

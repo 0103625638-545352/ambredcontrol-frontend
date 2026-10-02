@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type EstadoMikrotik, type EntradaAddressList, type VecinoRed, type NodoRed } from "../api/client";
 import { useConfirm } from "../components/ConfirmProvider";
 import { useToast } from "../components/ToastProvider";
+import { useFiltrosListado, BarraBuscadorDocumentos, filtrarLocal, sinPaginacion } from "../components/BuscadorDocumentos";
+import { Resaltar } from "../components/FormatoDocumento";
 
 // RouterOS normaliza cualquier valor de ancho de banda a bits/segundo al
 // devolverlo (aunque se haya creado como "5M") — esto lo vuelve legible.
@@ -49,7 +51,7 @@ export function MikrotikPage() {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">Control de Red (Mikrotik)</h2>
+      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-1">Control de Red (Mikrotik)</h2>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Equipos detectados en la red de cada nodo y visor de sus address-lists, para diagnóstico manual — el alta/baja de
         clientes se hace desde Clientes.
@@ -66,7 +68,7 @@ export function MikrotikPage() {
           <select
             value={nodoId ?? ""}
             onChange={(e) => setNodoId(Number(e.target.value))}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm font-medium"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm font-medium"
           >
             {nodos.map((n) => (
               <option key={n.id} value={n.id}>
@@ -111,11 +113,16 @@ function SeccionVecinos({ nodoId }: { nodoId: number }) {
     retry: false,
     refetchInterval: 30_000,
   });
+  // Buscador del listado (en el navegador: la lista ya viene completa).
+  const filtros = useFiltrosListado(sinPaginacion);
+  const vecinosFiltrados = filtrarLocal(vecinos, filtros, {
+    textos: (v) => [v.identidad, v.direccionIp, v.direccionMac, v.placa, v.version, v.interfaz],
+  });
 
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Equipos en la red de este nodo</h3>
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.15em] text-gray-600 dark:text-gray-300">Equipos en la red de este nodo</h3>
         {vecinos && (
           <span className="text-xs bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 px-2 py-1 rounded-md font-medium">
             {vecinos.length} equipo{vecinos.length === 1 ? "" : "s"} encontrado{vecinos.length === 1 ? "" : "s"}
@@ -127,9 +134,16 @@ function SeccionVecinos({ nodoId }: { nodoId: number }) {
         puede entrar a configurar ninguno de estos equipos.
       </p>
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · identidad, IP, MAC, placa, versión o interfaz"
+          placeholder="Ej: hAP, 192.168.88.2, ether2..."
+          mostrarPago={false}
+          mostrarFechas={false}
+        />
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Identidad</th>
               <th className="px-4 py-2">IP</th>
@@ -152,17 +166,17 @@ function SeccionVecinos({ nodoId }: { nodoId: number }) {
                 </td>
               </tr>
             )}
-            {!isLoading && !isError && vecinos?.length === 0 && (
+            {!isLoading && !isError && vecinosFiltrados?.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  El router de este nodo no encontró ningún equipo en su red todavía
+                  {filtros.hayFiltros ? "Ningún equipo coincide con la búsqueda." : "El router de este nodo no encontró ningún equipo en su red todavía"}
                 </td>
               </tr>
             )}
-            {vecinos?.map((v, i) => (
-              <tr key={`${v.direccionMac}-${i}`} className="border-t border-gray-100 dark:border-gray-700">
-                <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-100">{v.identidad}</td>
-                <td className="px-4 py-2 font-mono text-xs">{v.direccionIp || "—"}</td>
+            {vecinosFiltrados?.map((v, i) => (
+              <tr key={`${v.direccionMac}-${i}`} className="border-t border-stone-100 dark:border-gray-700">
+                <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-100"><Resaltar texto={v.identidad} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={v.direccionIp || "—"} termino={filtros.busquedaAplicada} /></td>
                 <td className="px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{v.direccionMac || "—"}</td>
                 <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{v.placa || "—"}</td>
                 <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{v.version || "—"}</td>
@@ -180,7 +194,6 @@ function SeccionAddressLists({ nodoId }: { nodoId: number }) {
   const queryClient = useQueryClient();
   const confirmar = useConfirm();
   const { mostrarToast } = useToast();
-  const [busqueda, setBusqueda] = useState("");
 
   const { data: entradas, isLoading } = useQuery({
     queryKey: ["mikrotik-address-lists", nodoId],
@@ -203,29 +216,25 @@ function SeccionAddressLists({ nodoId }: { nodoId: number }) {
     if (ok) eliminar.mutate(e.id);
   }
 
-  const filtro = busqueda.trim().toLowerCase();
-  const entradasFiltradas = filtro
-    ? entradas?.filter(
-        (e) =>
-          e.lista.toLowerCase().includes(filtro) ||
-          e.direccionIp.toLowerCase().includes(filtro) ||
-          (e.comentario ?? "").toLowerCase().includes(filtro)
-      )
-    : entradas;
+  // Buscador compartido de los listados (en el navegador: la lista ya viene completa).
+  const filtros = useFiltrosListado(sinPaginacion);
+  const entradasFiltradas = filtrarLocal(entradas, filtros, {
+    textos: (e) => [e.lista, e.direccionIp, e.comentario],
+  });
 
   return (
     <div className="max-w-3xl">
-      <input
-        type="text"
-        placeholder="Buscar por lista, IP o comentario..."
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full mb-3"
-      />
 
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · lista, IP o comentario"
+          placeholder="Ej: clientes-activos, 10.10.1.25..."
+          mostrarPago={false}
+          mostrarFechas={false}
+        />
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Lista</th>
               <th className="px-4 py-2">IP</th>
@@ -242,15 +251,15 @@ function SeccionAddressLists({ nodoId }: { nodoId: number }) {
             {!isLoading && entradasFiltradas?.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  {filtro ? `Sin resultados para "${busqueda}"` : "Este nodo no tiene ninguna address-list cargada todavía"}
+                  {filtros.hayFiltros ? "Ninguna entrada coincide con la búsqueda." : "Este nodo no tiene ninguna address-list cargada todavía"}
                 </td>
               </tr>
             )}
             {entradasFiltradas?.map((e) => (
-              <tr key={e.id} className="border-t border-gray-100 dark:border-gray-700">
+              <tr key={e.id} className="border-t border-stone-100 dark:border-gray-700">
                 <td className="px-4 py-2">
                   <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    className={`font-mono text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-sm ${
                       e.lista === "Suspendido"
                         ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
                         : "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
@@ -259,8 +268,8 @@ function SeccionAddressLists({ nodoId }: { nodoId: number }) {
                     {e.lista}
                   </span>
                 </td>
-                <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">{e.direccionIp}</td>
-                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{e.comentario || "—"}</td>
+                <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-800 dark:text-gray-100"><Resaltar texto={e.direccionIp} termino={filtros.busquedaAplicada} /></td>
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400"><Resaltar texto={e.comentario || "—"} termino={filtros.busquedaAplicada} /></td>
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => confirmarEliminar(e)}

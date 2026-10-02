@@ -1,9 +1,10 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api, type Proveedor, type RespuestaPaginada } from "../api/client";
 import { Paginacion } from "../components/Paginacion";
 import { HistorialProveedorModal } from "../components/HistorialProveedorModal";
-import { useDebounce } from "../hooks/useDebounce";
+import { useFiltrosListado, BarraBuscadorDocumentos } from "../components/BuscadorDocumentos";
+import { EncabezadoListado, CLASE_BOTON_ENCABEZADO, Resaltar } from "../components/FormatoDocumento";
 
 const TAMANO_PAGINA = 20;
 
@@ -20,8 +21,8 @@ export function ProveedoresPage() {
   };
   const [form, setForm] = useState(formVacio);
   const [pagina, setPagina] = useState(1);
-  const [busqueda, setBusqueda] = useState("");
-  const busquedaDebounced = useDebounce(busqueda);
+  // Buscador compartido de los listados (en el servidor: la lista pagina).
+  const filtros = useFiltrosListado(setPagina);
 
   const [proveedorEditandoId, setProveedorEditandoId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ razonSocial: "", email: "", telefono: "", direccion: "" });
@@ -29,16 +30,13 @@ export function ProveedoresPage() {
   // Controla para cuál proveedor se está mostrando el modal de historial
   const [proveedorHistorialId, setProveedorHistorialId] = useState<number | null>(null);
 
-  useEffect(() => {
-    setPagina(1);
-  }, [busquedaDebounced]);
 
   const { data: respuesta, isLoading } = useQuery({
-    queryKey: ["proveedores", pagina, busquedaDebounced],
+    queryKey: ["proveedores", pagina, ...filtros.clave],
     queryFn: async () =>
       (
         await api.get<RespuestaPaginada<Proveedor>>("/proveedores", {
-          params: { page: pagina, pageSize: TAMANO_PAGINA, q: busquedaDebounced || undefined },
+          params: { page: pagina, pageSize: TAMANO_PAGINA, ...filtros.params },
         })
       ).data,
     placeholderData: keepPreviousData,
@@ -74,92 +72,93 @@ export function ProveedoresPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Proveedores</h2>
-        <button
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-slate-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-slate-700"
-        >
-          {mostrarFormulario ? "Cancelar" : "+ Nuevo proveedor"}
-        </button>
-      </div>
-
-      <input
-        type="text"
-        placeholder="Buscar por identificación o razón social..."
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full mb-4"
-      />
-
-      {mostrarFormulario && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            crearProveedor.mutate();
-          }}
-          className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-4 grid grid-cols-2 gap-3"
-        >
-          <select
-            value={form.tipoIdentificacion}
-            onChange={(e) => setForm({ ...form, tipoIdentificacion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+      <div className="bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <EncabezadoListado
+          titulo="Proveedores"
+          conteo={respuesta?.paginacion.total}
+          singular="proveedor"
+          plural="proveedores"
+          acciones={
+            (
+              <button onClick={() => setMostrarFormulario(!mostrarFormulario)} className={CLASE_BOTON_ENCABEZADO}>
+                {mostrarFormulario ? "Cancelar" : "+ Nuevo proveedor"}
+              </button>
+            )
+          }
+        />
+        {mostrarFormulario && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              crearProveedor.mutate();
+            }}
+            className="p-4 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-300 dark:border-gray-700 grid grid-cols-2 gap-3"
           >
-            <option value="RUC">RUC</option>
-            <option value="CEDULA">Cédula</option>
-            <option value="PASAPORTE">Pasaporte</option>
-          </select>
-          <input
-            placeholder={form.tipoIdentificacion === "RUC" ? "RUC (13 dígitos)" : "Identificación"}
-            required
-            value={form.identificacion}
-            onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Razón social / Nombres"
-            required
-            value={form.razonSocial}
-            onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
-          />
-          <input
-            type="email"
-            placeholder="Correo electrónico"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Teléfono"
-            value={form.telefono}
-            onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Dirección"
-            value={form.direccion}
-            onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm col-span-2"
-          />
-          <button
-            type="submit"
-            disabled={crearProveedor.isPending}
-            className="col-span-2 bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-          >
-            {crearProveedor.isPending ? "Guardando..." : "Guardar proveedor"}
-          </button>
-          {crearProveedor.isError && (
-            <p className="col-span-2 text-red-600 dark:text-red-400 text-sm">
-              {(crearProveedor.error as any)?.response?.data?.error ?? "Error al guardar el proveedor"}
-            </p>
-          )}
-        </form>
-      )}
-
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <select
+              value={form.tipoIdentificacion}
+              onChange={(e) => setForm({ ...form, tipoIdentificacion: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            >
+              <option value="RUC">RUC</option>
+              <option value="CEDULA">Cédula</option>
+              <option value="PASAPORTE">Pasaporte</option>
+            </select>
+            <input
+              placeholder={form.tipoIdentificacion === "RUC" ? "RUC (13 dígitos)" : "Identificación"}
+              required
+              value={form.identificacion}
+              onChange={(e) => setForm({ ...form, identificacion: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Razón social / Nombres"
+              required
+              value={form.razonSocial}
+              onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
+            />
+            <input
+              type="email"
+              placeholder="Correo electrónico"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Teléfono"
+              value={form.telefono}
+              onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
+            />
+            <input
+              placeholder="Dirección"
+              value={form.direccion}
+              onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+              className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
+            />
+            <button
+              type="submit"
+              disabled={crearProveedor.isPending}
+              className="col-span-2 bg-brand-700 text-white py-2 rounded-sm text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
+            >
+              {crearProveedor.isPending ? "Guardando..." : "Guardar proveedor"}
+            </button>
+            {crearProveedor.isError && (
+              <p className="col-span-2 text-red-600 dark:text-red-400 text-sm">
+                {(crearProveedor.error as any)?.response?.data?.error ?? "Error al guardar el proveedor"}
+              </p>
+            )}
+          </form>
+        )}
+        <BarraBuscadorDocumentos
+          filtros={filtros}
+          etiquetaBusqueda="Buscar · RUC/cédula, razón social, email o teléfono"
+          placeholder="Ej: 0190345678001, Distribuidora..."
+          mostrarPago={false}
+        />
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Identificación</th>
               <th className="px-4 py-2">Razón Social</th>
@@ -177,15 +176,15 @@ export function ProveedoresPage() {
             {!isLoading && proveedores?.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-4 text-center text-gray-400 dark:text-gray-500">
-                  {busquedaDebounced ? `Sin resultados para "${busquedaDebounced}"` : "No hay proveedores"}
+                  {filtros.hayFiltros ? "Ningún proveedor coincide con la búsqueda." : "No hay proveedores"}
                 </td>
               </tr>
             )}
             {proveedores?.map((p) => (
               <Fragment key={p.id}>
-                <tr className="border-t border-gray-100 dark:border-gray-700">
-                  <td className="px-4 py-2">{p.identificacion}</td>
-                  <td className="px-4 py-2">{p.razonSocial}</td>
+                <tr className="border-t border-stone-100 dark:border-gray-700">
+                  <td className="px-4 py-2 font-mono text-xs"><Resaltar texto={p.identificacion} termino={filtros.busquedaAplicada} /></td>
+                  <td className="px-4 py-2 font-medium"><Resaltar texto={p.razonSocial} termino={filtros.busquedaAplicada} /></td>
                   <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
                     {p.email ?? <span className="text-gray-300 dark:text-gray-600 italic">sin correo</span>}
                   </td>
@@ -193,13 +192,13 @@ export function ProveedoresPage() {
                   <td className="px-4 py-2 text-right space-x-3">
                     <button
                       onClick={() => setProveedorHistorialId(p.id)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       Historial
                     </button>
                     <button
                       onClick={() => abrirEdicion(p)}
-                      className="text-slate-700 dark:text-slate-300 hover:underline text-xs font-medium"
+                      className="text-brand-700 dark:text-brand-300 hover:underline text-xs font-medium"
                     >
                       {proveedorEditandoId === p.id ? "Cancelar" : "Editar"}
                     </button>
@@ -207,7 +206,7 @@ export function ProveedoresPage() {
                 </tr>
 
                 {proveedorEditandoId === p.id && (
-                  <tr className="bg-slate-50 dark:bg-gray-700/40">
+                  <tr className="bg-stone-50 dark:bg-gray-700/40">
                     <td colSpan={5} className="px-4 py-3">
                       <form
                         onSubmit={(e) => {
@@ -222,39 +221,39 @@ export function ProveedoresPage() {
                           autoFocus
                           value={editForm.razonSocial}
                           onChange={(e) => setEditForm({ ...editForm, razonSocial: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
                         />
                         <input
                           type="email"
                           placeholder="Correo electrónico"
                           value={editForm.email}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <input
                           placeholder="Teléfono"
                           value={editForm.telefono}
                           onChange={(e) => setEditForm({ ...editForm, telefono: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
                         />
                         <input
                           placeholder="Dirección"
                           value={editForm.direccion}
                           onChange={(e) => setEditForm({ ...editForm, direccion: e.target.value })}
-                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-2 py-1.5 text-sm col-span-2"
+                          className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm col-span-2"
                         />
                         <div className="col-span-2 flex gap-2">
                           <button
                             type="submit"
                             disabled={editarProveedor.isPending}
-                            className="flex-1 bg-slate-800 text-white py-1.5 rounded-md text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+                            className="flex-1 bg-brand-700 text-white py-1.5 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-50"
                           >
                             {editarProveedor.isPending ? "Guardando..." : "Guardar cambios"}
                           </button>
                           <button
                             type="button"
                             onClick={() => setProveedorEditandoId(null)}
-                            className="flex-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
+                            className="flex-1 bg-stone-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 py-1.5 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500"
                           >
                             Cancelar
                           </button>
@@ -272,6 +271,7 @@ export function ProveedoresPage() {
             ))}
           </tbody>
         </table>
+        </div>
         {respuesta && (
           <Paginacion
             page={respuesta.paginacion.page}

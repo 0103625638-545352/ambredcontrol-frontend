@@ -1,8 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, Clock, AlertCircle, ShieldAlert, DatabaseBackup, FileText, TrendingUp, ClipboardList } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  AlertCircle,
+  ShieldAlert,
+  DatabaseBackup,
+  FileText,
+  TrendingUp,
+  ClipboardList,
+  Receipt,
+  DollarSign,
+  BellRing,
+} from "lucide-react";
 import { api, type DashboardResumen } from "../api/client";
 import { EstadoBadge } from "../components/EstadoBadge";
+import { TarjetaKpi, CLASE_TITULO_SECCION } from "../components/FormatoDocumento";
+
 
 interface Props {
   onNavegar: (pestana: "facturas" | "notasVenta" | "productos" | "ajustes") => void;
@@ -89,12 +103,31 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
     queryFn: async () => (await api.get<DashboardResumen>("/dashboard/resumen")).data,
   });
 
+  const alertasActivas =
+    (data?.productosStockBajo.length ?? 0) +
+    (data?.productosPorCaducar.length ?? 0) +
+    (data?.certificadoInvalido ? 1 : 0) +
+    (data?.certificadoPorCaducar ? 1 : 0) +
+    (data?.backupAtrasado ? 1 : 0);
+
   return (
     <div className="space-y-4">
+      {/* Cifras clave de un vistazo — mismo espíritu que un "Overview" de
+          panel de soporte: números grandes sobre color sólido, arriba de
+          todo, antes de cualquier alerta o tabla. */}
+      {puedeVentas && data && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <TarjetaKpi icono={FileText} etiqueta="Facturas emitidas (mes)" valor={String(data.resumen.documentosEmitidosMes)} color="bg-brand-700" />
+          <TarjetaKpi icono={Receipt} etiqueta="Notas de venta (mes)" valor={String(data.resumen.notasVentaMes)} color="bg-emerald-600" />
+          <TarjetaKpi icono={DollarSign} etiqueta="Total vendido (mes)" valor={`$${data.resumen.total}`} color="bg-sky-600" />
+          <TarjetaKpi icono={BellRing} etiqueta="Alertas activas" valor={String(alertasActivas)} color={alertasActivas > 0 ? "bg-amber-600" : "bg-gray-500"} />
+        </div>
+      )}
+
       {/* Alerta de stock bajo: pasiva antes (había que entrar a Productos a
           fijarse), ahora salta apenas se abre el Dashboard. */}
       {puedeProductos && data && data.productosStockBajo.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-sm p-4 flex items-start gap-3">
           <AlertTriangle strokeWidth={1.75} className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
@@ -122,7 +155,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
       {/* Alerta de caducidad: productos perecibles (por lote o con fecha
           única) que ya caducaron o caducan dentro de los próximos 30 días. */}
       {puedeProductos && data && data.productosPorCaducar.length > 0 && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-sm p-4 flex items-start gap-3">
           <Clock strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
@@ -155,7 +188,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           siquiera se puede leer del disco — ninguna factura/comprobante
           puede firmarse hasta que se solucione). Se muestra primero. */}
       {data?.certificadoInvalido && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-sm p-4 flex items-start gap-3">
           <AlertCircle strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
@@ -179,7 +212,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
       {/* Alerta de certificado por caducar: sin esto, un certificado vencido
           corta la facturación electrónica sin ningún aviso previo. */}
       {data?.certificadoPorCaducar && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-sm p-4 flex items-start gap-3">
           <ShieldAlert strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
@@ -207,7 +240,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           programador de tareas que dejó de correr en silencio no se nota
           hasta que hace falta restaurar. */}
       {data?.backupAtrasado && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-sm p-4 flex items-start gap-3">
           <DatabaseBackup strokeWidth={1.75} className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">
@@ -232,39 +265,39 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
       {puedeVentas && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         {/* Documentos electrónicos: accesos rápidos a Facturas y Notas de Venta */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
-            <FileText strokeWidth={1.75} className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+          <h2 className={`${CLASE_TITULO_SECCION} mb-3 flex items-center gap-2`}>
+            <FileText strokeWidth={1.75} className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             Documentos Electrónicos
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               onClick={() => onNavegar("facturas")}
-              className="text-left bg-gradient-to-br from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white rounded-lg p-4 h-32 flex flex-col justify-between transition-colors"
+              className="text-left bg-brand-700 hover:bg-brand-800 text-white rounded-sm p-4 h-32 flex flex-col justify-between transition-colors"
             >
               <FileText strokeWidth={1.5} className="w-8 h-8 opacity-80" />
               <div>
                 <p className="font-semibold">Facturas</p>
-                <p className="text-xs text-sky-100">Ver más →</p>
+                <p className="font-mono text-[10px] uppercase tracking-wider opacity-80">Ver más →</p>
               </div>
             </button>
             <button
               onClick={() => onNavegar("notasVenta")}
-              className="text-left bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg p-4 h-32 flex flex-col justify-between transition-colors"
+              className="text-left bg-emerald-700 hover:bg-emerald-800 text-white rounded-sm p-4 h-32 flex flex-col justify-between transition-colors"
             >
               <TrendingUp strokeWidth={1.5} className="w-8 h-8 opacity-80" />
               <div>
                 <p className="font-semibold">Notas de Venta</p>
-                <p className="text-xs text-emerald-100">Ver más →</p>
+                <p className="font-mono text-[10px] uppercase tracking-wider opacity-80">Ver más →</p>
               </div>
             </button>
           </div>
         </div>
 
         {/* Resumen del mes en curso */}
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-3 flex items-center gap-2">
-            <ClipboardList strokeWidth={1.75} className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+        <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+          <h2 className={`${CLASE_TITULO_SECCION} mb-3 flex items-center gap-2`}>
+            <ClipboardList strokeWidth={1.75} className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             Resumen del mes
           </h2>
           {isLoading || !data ? (
@@ -272,25 +305,25 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           ) : (
             <table className="w-full text-sm">
               <tbody>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
+                <tr className="border-b border-stone-100 dark:border-gray-700">
                   <td className="py-2 text-gray-500 dark:text-gray-400">Facturas emitidas</td>
-                  <td className="py-2 text-right font-medium text-gray-800 dark:text-gray-100">{data.resumen.documentosEmitidosMes}</td>
+                  <td className="py-2 text-right font-mono tabular-nums text-gray-800 dark:text-gray-100">{data.resumen.documentosEmitidosMes}</td>
                 </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
+                <tr className="border-b border-stone-100 dark:border-gray-700">
                   <td className="py-2 text-gray-500 dark:text-gray-400">Notas de venta</td>
-                  <td className="py-2 text-right font-medium text-gray-800 dark:text-gray-100">{data.resumen.notasVentaMes}</td>
+                  <td className="py-2 text-right font-mono tabular-nums text-gray-800 dark:text-gray-100">{data.resumen.notasVentaMes}</td>
                 </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
+                <tr className="border-b border-stone-100 dark:border-gray-700">
                   <td className="py-2 text-gray-500 dark:text-gray-400">Neto</td>
-                  <td className="py-2 text-right font-medium text-gray-800 dark:text-gray-100">${data.resumen.neto}</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="py-2 text-gray-500 dark:text-gray-400">IVA</td>
-                  <td className="py-2 text-right font-medium text-gray-800 dark:text-gray-100">${data.resumen.iva}</td>
+                  <td className="py-2 text-right font-mono tabular-nums text-gray-800 dark:text-gray-100">${data.resumen.neto}</td>
                 </tr>
                 <tr>
-                  <td className="py-2 text-gray-700 dark:text-gray-200 font-semibold">Total</td>
-                  <td className="py-2 text-right font-bold text-gray-900 dark:text-gray-100">${data.resumen.total}</td>
+                  <td className="py-2 text-gray-500 dark:text-gray-400">IVA</td>
+                  <td className="py-2 text-right font-mono tabular-nums text-gray-800 dark:text-gray-100">${data.resumen.iva}</td>
+                </tr>
+                <tr className="border-t-2 border-gray-900 dark:border-gray-200">
+                  <td className="py-2.5 text-gray-900 dark:text-gray-50 font-bold">TOTAL USD</td>
+                  <td className="py-2.5 text-right font-mono tabular-nums font-bold text-gray-900 dark:text-gray-50">{data.resumen.total}</td>
                 </tr>
               </tbody>
             </table>
@@ -304,8 +337,8 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
         {/* Tendencia de ventas: una sola serie (facturas + notas de venta
             combinadas), por eso no lleva leyenda — el título ya dice qué se
             grafica. Los días sin ventas quedan en $0, no se ocultan. */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Tendencia de ventas</h2>
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+          <h2 className={`${CLASE_TITULO_SECCION} mb-1`}>Tendencia de ventas</h2>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Últimos 14 días · incluye facturas y notas de venta</p>
           {data && data.ventasUltimosDias.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -327,7 +360,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
                   width={56}
                 />
                 <Tooltip content={<TooltipVentasPorDia />} cursor={{ fill: "var(--chart-grid)" }} />
-                <Bar dataKey="total" fill="var(--chart-series-1)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                <Bar dataKey="total" fill="var(--chart-series-1)" radius={[1, 1, 0, 0]} maxBarSize={24} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -339,8 +372,8 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
 
         {/* Top 5 productos del mes: barra horizontal para que los nombres
             (variables en longitud) no compitan por espacio con el eje. */}
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-4">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">Productos más vendidos</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-4">
+          <h2 className={`${CLASE_TITULO_SECCION} mb-1`}>Productos más vendidos</h2>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Mes en curso · por unidades</p>
           {data && data.topProductosMes.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -362,7 +395,7 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
                   width={90}
                 />
                 <Tooltip content={<TooltipTopProductos />} cursor={{ fill: "var(--chart-grid)" }} />
-                <Bar dataKey="cantidad" fill="var(--chart-series-1)" radius={[0, 4, 4, 0]} maxBarSize={16} />
+                <Bar dataKey="cantidad" fill="var(--chart-series-1)" radius={[0, 1, 1, 0]} maxBarSize={16} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -376,10 +409,10 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
 
       {/* Facturas recientes */}
       {puedeVentas && (
-      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 px-4 pt-4 pb-2">Facturas recientes</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+        <h2 className={`${CLASE_TITULO_SECCION} px-4 py-2.5 border-b border-stone-300 dark:border-gray-700`}>Facturas recientes</h2>
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-4 py-2">Serie</th>
               <th className="px-4 py-2">Número</th>
@@ -404,13 +437,13 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
             {data?.facturasRecientes.map((f) => {
               const { serie, numero } = separarSecuencial(f.secuencial);
               return (
-                <tr key={f.id} className="border-t border-gray-100 dark:border-gray-700">
+                <tr key={f.id} className="border-t border-stone-100 dark:border-gray-700">
                   <td className="px-4 py-2 font-mono text-xs">{serie}</td>
                   <td className="px-4 py-2 font-mono text-xs">{numero}</td>
                   <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{data.ambiente}</td>
                   <td className="px-4 py-2">{f.cliente}</td>
                   <td className="px-4 py-2">{new Date(f.fechaEmision).toLocaleDateString("es-EC")}</td>
-                  <td className="px-4 py-2 text-right">${f.total}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums">${f.total}</td>
                   <td className="px-4 py-2">
                     <EstadoBadge estado={f.estado} />
                   </td>
@@ -426,10 +459,10 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
           (facturas + notas de venta), solo tiene sentido si hay más de una
           sucursal activa. */}
       {puedeVentas && data && data.ventasPorSucursal.length > 1 && (
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 px-4 pt-4 pb-2">Ventas por sucursal (mes en curso)</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 overflow-hidden">
+          <h2 className={`${CLASE_TITULO_SECCION} px-4 py-2.5 border-b border-stone-300 dark:border-gray-700`}>Ventas por sucursal (mes en curso)</h2>
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+            <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
               <tr>
                 <th className="px-4 py-2">Sucursal</th>
                 <th className="px-4 py-2 text-right">Documentos</th>
@@ -438,10 +471,10 @@ export function DashboardPage({ onNavegar, puedeConfiguracion, puedeVentas, pued
             </thead>
             <tbody>
               {data.ventasPorSucursal.map((s) => (
-                <tr key={s.sucursalId} className="border-t border-gray-100 dark:border-gray-700">
+                <tr key={s.sucursalId} className="border-t border-stone-100 dark:border-gray-700">
                   <td className="px-4 py-2">{s.sucursalNombre}</td>
-                  <td className="px-4 py-2 text-right">{s.documentos}</td>
-                  <td className="px-4 py-2 text-right font-medium text-gray-800 dark:text-gray-100">${s.total}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums">{s.documentos}</td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums text-gray-800 dark:text-gray-100">{s.total}</td>
                 </tr>
               ))}
             </tbody>

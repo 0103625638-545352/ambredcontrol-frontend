@@ -26,7 +26,7 @@ export function ModalLotesProducto({ productoId, nombreProducto, onCerrar }: Pro
       )}
       {lotes && lotes.length > 0 && (
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-left text-gray-600 dark:text-gray-300">
+          <thead className="bg-stone-100 dark:bg-gray-900/60 border-b border-stone-300 dark:border-gray-700 text-left font-mono text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 [&_th]:font-medium">
             <tr>
               <th className="px-3 py-2">N° de lote</th>
               <th className="px-3 py-2">Caducidad</th>
@@ -40,7 +40,7 @@ export function ModalLotesProducto({ productoId, nombreProducto, onCerrar }: Pro
               const vencido = fecha < hoy;
               const diasRestantes = Math.ceil((fecha.getTime() - hoy.getTime()) / (24 * 60 * 60 * 1000));
               return (
-                <tr key={l.id} className="border-t border-gray-100 dark:border-gray-700">
+                <tr key={l.id} className="border-t border-stone-100 dark:border-gray-700">
                   <td className="px-3 py-2">{l.numeroLote || "—"}</td>
                   <td className="px-3 py-2">{fecha.toLocaleDateString("es-EC")}</td>
                   <td className="px-3 py-2 text-right">{l.cantidad}</td>

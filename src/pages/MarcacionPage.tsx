@@ -37,10 +37,10 @@ export function MarcacionPage({ empresaIdInicial }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-stone-100 dark:bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Marcación de asistencia</h1>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-50">Marcación de asistencia</h1>
           <BotonTema
             tema={tema}
             onAlternar={alternarTema}
@@ -48,7 +48,7 @@ export function MarcacionPage({ empresaIdInicial }: Props) {
           />
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-sm border border-stone-300 dark:border-gray-700 p-5">
           {!empresaId ? (
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Selecciona tu empresa</p>
@@ -57,7 +57,7 @@ export function MarcacionPage({ empresaIdInicial }: Props) {
                   <button
                     key={e.id}
                     onClick={() => elegirEmpresa(e.id)}
-                    className="w-full text-left border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:border-sky-500 dark:hover:border-sky-400"
+                    className="w-full text-left border border-stone-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:border-sky-500 dark:hover:border-sky-400"
                   >
                     {e.nombre}
                   </button>

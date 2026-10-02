@@ -85,22 +85,22 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
     <Modal titulo="Nuevo asiento manual" onCerrar={onCerrar} ancho="max-w-2xl">
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
-          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Fecha</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Fecha</label>
           <input
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Descripción</label>
+          <label className="block font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Descripción</label>
           <input
             type="text"
             placeholder="Ej: Pago de arriendo de julio"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm"
+            className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
           />
         </div>
       </div>
@@ -112,7 +112,7 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
               <select
                 value={linea.cuentaId}
                 onChange={(e) => actualizarLinea(indice, { cuentaId: e.target.value ? Number(e.target.value) : "" })}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               >
                 <option value="">Cuenta...</option>
                 {cuentasActivas.map((c) => (
@@ -130,7 +130,7 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
                 placeholder="Debe"
                 value={linea.debe}
                 onChange={(e) => actualizarLinea(indice, { debe: e.target.value, haber: e.target.value ? "" : linea.haber })}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               />
             </div>
             <div className="col-span-2">
@@ -141,7 +141,7 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
                 placeholder="Haber"
                 value={linea.haber}
                 onChange={(e) => actualizarLinea(indice, { haber: e.target.value, debe: e.target.value ? "" : linea.debe })}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               />
             </div>
             <div className="col-span-2">
@@ -150,7 +150,7 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
                 placeholder="Glosa"
                 value={linea.glosa}
                 onChange={(e) => actualizarLinea(indice, { glosa: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-2 py-1.5 text-sm"
+                className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm"
               />
             </div>
             <div className="col-span-1 flex justify-center pt-1.5">
@@ -172,7 +172,7 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
         + Agregar línea
       </button>
 
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+      <div className="border-t border-stone-300 dark:border-gray-700 pt-3">
         <div className={`flex justify-between text-sm mb-1 ${cuadra ? "text-gray-600 dark:text-gray-300" : "text-red-600 dark:text-red-400"}`}>
           <span>Total Debe: ${totalDebe.toFixed(2)}</span>
           <span>Total Haber: ${totalHaber.toFixed(2)}</span>
@@ -184,7 +184,7 @@ export function ModalCrearAsientoManual({ onCerrar }: Props) {
           type="button"
           onClick={() => crearAsiento.mutate()}
           disabled={!formularioValido || crearAsiento.isPending}
-          className="w-full bg-brand-600 text-white py-2 rounded-md text-sm font-medium hover:bg-brand-700 disabled:opacity-40 mt-2"
+          className="w-full bg-brand-700 text-white py-2 rounded-md text-sm font-semibold hover:bg-brand-800 disabled:opacity-40 mt-2"
         >
           {crearAsiento.isPending ? "Creando..." : "Crear asiento"}
         </button>

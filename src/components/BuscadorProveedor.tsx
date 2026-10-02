@@ -50,7 +50,7 @@ export function BuscadorProveedor({ proveedorId, onSeleccionar }: Props) {
   return (
     <div ref={contenedorRef} className="relative mb-3">
       {proveedorSeleccionado ? (
-        <div className="flex items-center justify-between border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 rounded-md px-3 py-2">
+        <div className="flex items-center justify-between border border-stone-300 dark:border-gray-600 bg-stone-50 dark:bg-gray-700 rounded-md px-3 py-2">
           <div>
             <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{proveedorSeleccionado.razonSocial}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">{proveedorSeleccionado.identificacion}</p>
@@ -77,10 +77,10 @@ export function BuscadorProveedor({ proveedorId, onSeleccionar }: Props) {
               setAbierto(true);
             }}
             onFocus={() => setAbierto(true)}
-            className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 text-sm w-full"
+            className="border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm focus:outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600 px-2 py-1.5 text-sm w-full"
           />
           {abierto && textoDebounced.trim().length >= 2 && (
-            <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-56 overflow-y-auto">
+            <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 rounded-md shadow-lg max-h-56 overflow-y-auto">
               {isFetching && <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">Buscando...</p>}
               {!isFetching && resultados?.length === 0 && (
                 <div className="px-3 py-2">
@@ -90,7 +90,7 @@ export function BuscadorProveedor({ proveedorId, onSeleccionar }: Props) {
                   <button
                     type="button"
                     onClick={() => setMostrarModal(true)}
-                    className="w-full bg-brand-600 text-white text-xs font-medium py-1.5 rounded-md hover:bg-brand-700"
+                    className="w-full bg-brand-700 text-white text-xs font-semibold py-1.5 rounded-md hover:bg-brand-800"
                   >
                     + Nuevo proveedor
                   </button>
@@ -101,7 +101,7 @@ export function BuscadorProveedor({ proveedorId, onSeleccionar }: Props) {
                   key={p.id}
                   type="button"
                   onClick={() => seleccionar(p)}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-stone-50 dark:hover:bg-gray-700 border-b border-stone-100 dark:border-gray-700 last:border-b-0"
                 >
                   <p className="text-gray-800 dark:text-gray-100">{p.razonSocial}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{p.identificacion}</p>
