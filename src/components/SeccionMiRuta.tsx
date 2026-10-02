@@ -6,6 +6,7 @@ import { useSincronizarAccionesPendientes } from "../hooks/useSincronizarAccione
 import { agregarAccionPendiente } from "../utils/colaOffline";
 import { MapaRuta, type ParadaMapa } from "./MapaRuta";
 import { DetalleTrabajoVisita } from "./DetalleTrabajoVisita";
+import { ContratoServicioVisita } from "./ContratoServicioVisita";
 
 export const ETIQUETA_ESTADO: Record<string, string> = {
   PENDIENTE: "Pendiente",
@@ -265,6 +266,7 @@ export function SeccionMiRuta({ compacto = false }: { compacto?: boolean } = {})
                   </div>
                 )}
                 {v.estado === "COMPLETADA" && <DetalleTrabajoVisita visita={v} />}
+                {v.estado === "COMPLETADA" && <ContratoServicioVisita visita={v} />}
               </li>
               );
             })}

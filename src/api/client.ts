@@ -1492,6 +1492,8 @@ export interface VisitaTecnica {
   // existente — lo indica el técnico al llenar el acta, opcional.
   tipoTrabajo?: TipoTrabajoVisita | null;
   materialesUtilizados?: MaterialUtilizadoVisita[];
+  // Contrato del servicio firmado en el celular (ver ContratoServicioVisita.tsx).
+  contrato?: { id: number; pdfUrl: string; fecha: string; nombreFirmante: string } | null;
 }
 
 export interface RutaVisita {

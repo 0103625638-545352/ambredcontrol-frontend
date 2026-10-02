@@ -75,6 +75,7 @@ const SECCIONES_AJUSTES: { id: string; titulo: string; palabras: string }[] = [
   { id: "ajuste-numeracion", titulo: "Numeración inicial", palabras: "secuencial número factura nota" },
   { id: "ajuste-codigos-sri", titulo: "Códigos SRI", palabras: "forma de pago tipo identificación" },
   { id: "ajuste-whatsapp", titulo: "Recordatorio de vencimiento por WhatsApp", palabras: "mensaje cobro recordatorio" },
+  { id: "ajuste-contrato", titulo: "Contrato de servicio de internet", palabras: "contrato firma clausulas" },
 ];
 
 // El logo se sube tal cual se ve en el RIDE (PDF de factura/nota de crédito)
@@ -1070,6 +1071,8 @@ export function AjustesPage() {
         )}
       </div>
 
+      <SeccionTextoContrato />
+
       <div className="p-5 border-t border-stone-300 dark:border-gray-700 [&>*:not(h3)]:max-w-2xl">
         <h3 id="ajuste-whatsapp" className="scroll-mt-44 -mx-5 -mt-5 mb-3 px-5 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-200 dark:border-gray-700 font-mono text-[11px] uppercase tracking-[0.15em] text-gray-700 dark:text-gray-200">Recordatorio de vencimiento por WhatsApp</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
@@ -1207,6 +1210,64 @@ export function AjustesPage() {
       </div>
 
       <DiccionarioBuscador />
+    </div>
+  );
+}
+
+// Cláusulas del contrato que el cliente firma en el celular del técnico (ver
+// components/ContratoServicioVisita.tsx). Las marcas {{asi}} se rellenan
+// solas con los datos del cliente y del plan.
+function SeccionTextoContrato() {
+  const queryClient = useQueryClient();
+  const { mostrarToast } = useToast();
+  const [texto, setTexto] = useState<string | null>(null);
+  const { data } = useQuery({
+    queryKey: ["configuracion-contrato"],
+    queryFn: async () => (await api.get<{ texto: string; personalizado: boolean; textoPorDefecto: string }>("/configuracion/contrato")).data,
+  });
+  const valor = texto ?? data?.texto ?? "";
+  const guardar = useMutation({
+    mutationFn: async (nuevo: string) => (await api.put("/configuracion/contrato", { texto: nuevo })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["configuracion-contrato"] });
+      setTexto(null);
+      mostrarToast("Texto del contrato guardado", "success");
+    },
+    onError: (e: any) => mostrarToast(e.response?.data?.error ?? "No se pudo guardar el texto del contrato"),
+  });
+
+  return (
+    <div className="p-5 border-t border-stone-300 dark:border-gray-700">
+      <h3 id="ajuste-contrato" className="scroll-mt-44 -mx-5 -mt-5 mb-3 px-5 py-2.5 bg-stone-50 dark:bg-gray-900/40 border-b border-stone-200 dark:border-gray-700 font-mono text-[11px] uppercase tracking-[0.15em] text-gray-700 dark:text-gray-200">Contrato de servicio de internet</h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 max-w-2xl">
+        Cláusulas del contrato que el cliente firma en el celular del técnico al terminar la instalación. Puedes usar estas marcas, que se rellenan solas:{" "}
+        <code className="text-[11px]">{"{{cliente}} {{cedula}} {{direccion}} {{plan}} {{bajada}} {{subida}} {{precio}} {{diaCorte}} {{fechaInicio}} {{vigencia}} {{textoVigencia}} {{empresa}} {{rucEmpresa}}"}</code>.
+        Los datos del cliente, los equipos en comodato y la firma se agregan solos al PDF.
+      </p>
+      <p className="text-xs text-amber-700 dark:text-amber-400 mb-2 max-w-2xl">
+        El texto por defecto es un punto de partida general. Hazlo revisar por tu abogado y ajústalo al modelo de contrato de adhesión que exige ARCOTEL.
+      </p>
+      <textarea
+        id="texto-contrato"
+        rows={14}
+        value={valor}
+        onChange={(e) => setTexto(e.target.value)}
+        className="w-full border border-stone-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-sm px-3 py-2 text-sm font-mono leading-relaxed"
+      />
+      <div className="flex flex-wrap gap-2 mt-2">
+        <button
+          onClick={() => guardar.mutate(valor)}
+          disabled={guardar.isPending || texto === null}
+          className="bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white text-sm font-semibold px-4 py-1.5 rounded-sm"
+        >
+          {guardar.isPending ? "Guardando..." : "Guardar texto del contrato"}
+        </button>
+        {data?.personalizado && (
+          <button onClick={() => guardar.mutate("")} disabled={guardar.isPending} className="text-sm text-gray-600 dark:text-gray-300 hover:underline">
+            Volver al texto por defecto
+          </button>
+        )}
+      </div>
     </div>
   );
 }

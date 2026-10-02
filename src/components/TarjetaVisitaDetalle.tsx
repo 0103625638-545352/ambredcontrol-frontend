@@ -44,6 +44,7 @@ interface VisitaParaTarjeta {
   equiposDejados?: EquipoDejadoVisita[];
   tipoTrabajo?: TipoTrabajoVisita | null;
   materialesUtilizados?: MaterialUtilizadoVisita[];
+  contrato?: { pdfUrl: string; fecha: string; nombreFirmante: string } | null;
 }
 
 // Una visita técnica con su acta completa (trabajo hecho, equipos dejados,
@@ -73,6 +74,11 @@ export function TarjetaVisitaDetalle({ visita, encabezado }: { visita: VisitaPar
             {visita.esUrgente && <span className="text-red-600 dark:text-red-400 mr-1">🚨 Urgente —</span>}
             {encabezado}
           </p>
+          {visita.contrato && (
+            <a href={urlArchivoSubido(visita.contrato.pdfUrl)!} target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline">
+              Contrato firmado por {visita.contrato.nombreFirmante} ({new Date(visita.contrato.fecha).toLocaleDateString("es-EC")})
+            </a>
+          )}
           {visita.direccion && <p className="text-xs text-gray-500 dark:text-gray-400">{visita.direccion}</p>}
           {visita.motivoVisita && (
             <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
