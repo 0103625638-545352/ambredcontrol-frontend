@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type RutaVisita } from "../api/client";
 import { useToast } from "./ToastProvider";
@@ -67,7 +67,37 @@ export function SeccionMiRuta({ compacto = false }: { compacto?: boolean } = {})
   const { data: ruta, isLoading } = useQuery({
     queryKey: ["mi-ruta-hoy"],
     queryFn: async () => (await api.get<RutaVisita | null>("/visitas/mi-ruta-hoy")).data,
+    // Se refresca sola: una visita urgente agendada desde la oficina (por
+    // ejemplo desde un ticket de soporte) aparece sin que el técnico tenga
+    // que recargar la pantalla.
+    refetchInterval: 60_000,
   });
+
+  // Aviso cuando aparece una parada nueva en la ruta ya cargada (no en la
+  // primera carga): toast + vibración del celular si la admite.
+  const idsConocidos = useRef<Set<number> | null>(null);
+  useEffect(() => {
+    if (!ruta) return;
+    const actuales = new Set(ruta.visitas.map((v) => v.id));
+    if (idsConocidos.current) {
+      const nuevas = ruta.visitas.filter((v) => !idsConocidos.current!.has(v.id));
+      if (nuevas.length > 0) {
+        const urgente = nuevas.find((v) => v.esUrgente);
+        mostrarToast(
+          urgente
+            ? `Nueva visita URGENTE: ${urgente.cliente?.razonSocial ?? urgente.nombreContacto}`
+            : `Se agregó ${nuevas.length} visita(s) a tu ruta de hoy`,
+          "info"
+        );
+        try {
+          navigator.vibrate?.(urgente ? [300, 150, 300] : 200);
+        } catch {
+          // algunos navegadores no permiten vibrar — el aviso en pantalla alcanza
+        }
+      }
+    }
+    idsConocidos.current = actuales;
+  }, [ruta, mostrarToast]);
 
   const marcarLlegada = useMutation({
     mutationFn: async (visitaId: number) => {

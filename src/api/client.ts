@@ -2592,6 +2592,18 @@ export interface TicketDetalle extends TicketSoporte {
   puedeResponderWhatsapp: boolean;
 }
 
+export interface TecnicosCercanos {
+  clienteConUbicacion: boolean;
+  tecnicos: {
+    empleadoId: number;
+    nombre: string;
+    cargo: string;
+    distanciaMetros: number | null;
+    minutosDesdeUbicacion: number | null;
+    visitasPendientesHoy: number;
+  }[];
+}
+
 export interface ResumenTickets {
   abiertos: number;
   enProceso: number;

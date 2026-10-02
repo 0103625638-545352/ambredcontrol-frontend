@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Inbox, Clock, AlertTriangle, CheckCircle2, MessageCircle, Phone, User, Monitor } from "lucide-react";
-import { api, type TicketSoporte, type TicketDetalle, type ResumenTickets, type EstadoTicket, type PrioridadTicket } from "../api/client";
+import { api, type TicketSoporte, type TicketDetalle, type ResumenTickets, type EstadoTicket, type PrioridadTicket, type TecnicosCercanos } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
 import { TarjetaKpi, CLASE_CAMPO, CLASE_ETIQUETA, CLASE_THEAD, CLASE_TITULO_SECCION, CLASE_ACCION } from "../components/FormatoDocumento";
 import { BuscadorCliente } from "../components/BuscadorCliente";
@@ -68,6 +68,48 @@ function fechaHora(iso: string | null): string {
 function hoyInput(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function textoDistancia(metros: number): string {
+  return metros < 1000 ? `${metros} m` : `${(metros / 1000).toFixed(1)} km`;
+}
+
+// Técnicos ordenados por cercanía a la casa del cliente (según la última
+// ubicación GPS de su celular) — para elegir a quién mandar sin abrir el mapa.
+function SugerenciaTecnicos({ ticketId, onElegir, elegido }: { ticketId: number; onElegir: (empleadoId: number) => void; elegido: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["tickets-tecnicos-cercanos", ticketId],
+    queryFn: async () => (await api.get<TecnicosCercanos>(`/tickets/${ticketId}/tecnicos-cercanos`)).data,
+    refetchInterval: 60_000,
+  });
+  if (isLoading || !data) return <p className="text-xs text-gray-400">Buscando técnicos cercanos...</p>;
+  return (
+    <div className="w-full">
+      <p className={`${CLASE_ETIQUETA} mb-1`}>
+        {data.clienteConUbicacion ? "Técnicos más cercanos al cliente ahora" : "El cliente no tiene ubicación guardada — técnicos por carga de trabajo"}
+      </p>
+      <ul className="divide-y divide-stone-200 dark:divide-gray-700 border border-stone-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        {data.tecnicos.slice(0, 5).map((t, i) => (
+          <li key={t.empleadoId} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-2 py-1.5 text-sm">
+            <span className="flex-1 min-w-32">
+              {t.nombre}
+              {i === 0 && t.distanciaMetros != null && <span className="ml-2 font-mono text-[10px] uppercase tracking-wider border border-emerald-500 text-emerald-700 dark:text-emerald-400 px-1 rounded-sm">Más cerca</span>}
+            </span>
+            <span className="font-mono text-xs tabular-nums text-gray-600 dark:text-gray-300">
+              {t.distanciaMetros != null ? `${textoDistancia(t.distanciaMetros)} · hace ${t.minutosDesdeUbicacion} min` : "sin ubicación reciente"}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{t.visitasPendientesHoy} visita(s) pendiente(s) hoy</span>
+            <button
+              onClick={() => onElegir(t.empleadoId)}
+              className={`text-xs font-semibold ${elegido === String(t.empleadoId) ? "text-emerald-700 dark:text-emerald-400" : "text-brand-700 dark:text-brand-300 hover:underline"}`}
+            >
+              {elegido === String(t.empleadoId) ? "Elegido" : "Elegir"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function TiempoSla({ ticket }: { ticket: TicketSoporte }) {
@@ -509,6 +551,7 @@ function DetalleTicket({ id, tecnicos, onCerrar }: { id: number; tecnicos: Tecni
         </div>
         {agendando && (
           <div className="sm:col-span-4 flex flex-wrap items-end gap-2 bg-stone-50 dark:bg-gray-900/40 p-2 rounded-sm">
+            <SugerenciaTecnicos ticketId={ticket.id} elegido={visita.empleadoId} onElegir={(empleadoId) => setVisita({ empleadoId: String(empleadoId), fecha: hoyInput() })} />
             <label className="flex-1 min-w-40">
               <span className={CLASE_ETIQUETA}>Técnico</span>
               <select value={visita.empleadoId} onChange={(e) => setVisita({ ...visita, empleadoId: e.target.value })} className={CLASE_CAMPO}>
