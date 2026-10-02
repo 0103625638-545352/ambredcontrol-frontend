@@ -41,6 +41,7 @@ import { MapaRedPage } from "./pages/MapaRedPage";
 import { LocalizacionTecnicosPage } from "./pages/LocalizacionTecnicosPage";
 import { CentroControlPage } from "./pages/CentroControlPage";
 import { TicketsPage } from "./pages/TicketsPage";
+import { ConciliacionBancariaPage } from "./pages/ConciliacionBancariaPage";
 import { FacturacionInternetPage } from "./pages/FacturacionInternetPage";
 import { AcercaDePage } from "./pages/AcercaDePage";
 import { AjustesPage } from "./pages/AjustesPage";
@@ -403,6 +404,7 @@ function App() {
               {pestanaActiva === "ubicacionTecnicos" && puedeUbicacionTecnicos && <LocalizacionTecnicosPage />}
               {pestanaActiva === "centroControl" && puedeCentroControl && <CentroControlPage />}
               {pestanaActiva === "tickets" && puedeTickets && <TicketsPage />}
+              {pestanaActiva === "conciliacion" && puedeMikrotik && <ConciliacionBancariaPage />}
               {pestanaActiva === "facturacionInternet" && puedeMikrotik && <FacturacionInternetPage />}
               {pestanaActiva === "ajustes" && puedeConfiguracion && <AjustesPage />}
               {pestanaActiva === "acercaDe" && <AcercaDePage />}

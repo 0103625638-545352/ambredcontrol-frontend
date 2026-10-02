@@ -46,6 +46,7 @@ import {
   Info,
   Siren,
   Headset,
+  BadgeDollarSign,
   type LucideIcon,
 } from "lucide-react";
 import { api, type DashboardResumen } from "../api/client";
@@ -95,6 +96,7 @@ export type Pestana =
   | "ubicacionTecnicos"
   | "centroControl"
   | "tickets"
+  | "conciliacion"
   | "ajustes"
   | "acercaDe";
 
@@ -194,6 +196,7 @@ const iconosPorPestana: Record<Pestana, LucideIcon> = {
   ubicacionTecnicos: LocateFixed,
   centroControl: Siren,
   tickets: Headset,
+  conciliacion: BadgeDollarSign,
   // No aparece en el menú a propósito — el acceso vive en el encabezado
   // junto a "Cambiar contraseña" (ver App.tsx), pero el ícono igual se
   // define acá para que este Record siga siendo exhaustivo sobre Pestana.
@@ -328,6 +331,7 @@ export function MenuSuperior({
           // del cliente, nunca se mezcla con la venta de equipos/servicios
           // varios que sigue en Facturas.
           { id: "facturacionInternet", etiqueta: "Facturación de Internet", icono: iconos.facturacionInternet },
+          { id: "conciliacion", etiqueta: "Conciliación Bancaria", icono: iconos.conciliacion },
         ] as Item[])
       : []),
     // Permiso propio "olt", separado de "mikrotik" (equipo y responsable
@@ -470,7 +474,7 @@ export function grupoDePestana(pestana: Pestana): string | null {
     cuentasBancarias: "Contabilidad", bancos: "Contabilidad", contabilidad: "Contabilidad", ats: "Contabilidad",
     empleados: "Personal Técnico", nomina: "Personal Técnico", vehiculos: "Personal Técnico",
     reporteCombustible: "Personal Técnico",
-    mapaRed: "Red / ISP", ubicacionTecnicos: "Red / ISP", centroControl: "Red / ISP", tickets: "Red / ISP", visitas: "Red / ISP", historialVisitas: "Red / ISP",
+    mapaRed: "Red / ISP", ubicacionTecnicos: "Red / ISP", centroControl: "Red / ISP", tickets: "Red / ISP", conciliacion: "Red / ISP", visitas: "Red / ISP", historialVisitas: "Red / ISP",
     nodos: "Red / ISP", mikrotik: "Red / ISP", planesInternet: "Red / ISP", promociones: "Red / ISP",
     facturacionInternet: "Red / ISP", olts: "Red / ISP", redFisica: "Red / ISP",
     reportes: "Reportes", reporteadorPrincipal: "Reportes",
