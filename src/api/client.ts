@@ -19,6 +19,22 @@ export const api = axios.create({
   baseURL: URL_BASE_API,
 });
 
+// Excepción a "una sola instancia de axios": el portal del cliente (ver
+// pages/PortalClientePage.tsx) es público y tiene su propia sesión — no debe
+// mandar el token del personal ni, ante un 401, borrar la sesión del personal
+// y recargar como hace el interceptor de "api". Su token vive en
+// sessionStorage (se borra al cerrar la pestaña, útil en un celular ajeno).
+export const apiPortal = axios.create({ baseURL: `${URL_BASE_API}/portal` });
+apiPortal.interceptors.request.use((config) => {
+  try {
+    const token = sessionStorage.getItem("tokenPortal");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  } catch {
+    // sin acceso a sessionStorage (navegador muy restringido): sigue sin sesión
+  }
+  return config;
+});
+
 // --- Interceptor de petición: agrega el token a CADA llamada automáticamente ---
 // Así, ninguna pantalla (ProductosPage, FacturasPage, etc.) tiene que acordarse
 // de mandar el token manualmente — queda centralizado aquí, una sola vez.
@@ -2561,7 +2577,7 @@ export interface TicketSoporte {
   cliente: { id: number; razonSocial: string; telefono: string | null; direccion: string | null } | null;
   nombreContacto: string;
   telefono: string | null;
-  canal: "WHATSAPP" | "LLAMADA" | "PRESENCIAL" | "SISTEMA";
+  canal: "WHATSAPP" | "LLAMADA" | "PRESENCIAL" | "SISTEMA" | "PORTAL";
   categoria: string;
   prioridad: PrioridadTicket;
   asunto: string;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Inbox, Clock, AlertTriangle, CheckCircle2, MessageCircle, Phone, User, Monitor } from "lucide-react";
-import { api, type TicketSoporte, type TicketDetalle, type ResumenTickets, type EstadoTicket, type PrioridadTicket, type TecnicosCercanos } from "../api/client";
+import { Inbox, Clock, AlertTriangle, CheckCircle2, MessageCircle, Phone, User, Monitor, Globe } from "lucide-react";
+import { api, URL_BASE_API, type TicketSoporte, type TicketDetalle, type ResumenTickets, type EstadoTicket, type PrioridadTicket, type TecnicosCercanos } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
 import { TarjetaKpi, CLASE_CAMPO, CLASE_ETIQUETA, CLASE_THEAD, CLASE_TITULO_SECCION, CLASE_ACCION } from "../components/FormatoDocumento";
 import { BuscadorCliente } from "../components/BuscadorCliente";
@@ -37,7 +37,7 @@ const COLOR_PRIORIDAD: Record<PrioridadTicket, string> = {
   MEDIA: "bg-amber-500 text-white",
   BAJA: "bg-gray-400 text-white",
 };
-const ICONO_CANAL = { WHATSAPP: MessageCircle, LLAMADA: Phone, PRESENCIAL: User, SISTEMA: Monitor } as const;
+const ICONO_CANAL = { WHATSAPP: MessageCircle, LLAMADA: Phone, PRESENCIAL: User, SISTEMA: Monitor, PORTAL: Globe } as const;
 
 interface Tecnico {
   id: number;
@@ -68,6 +68,25 @@ function fechaHora(iso: string | null): string {
 function hoyInput(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Los comprobantes que sube el cliente desde el portal llegan como una ruta
+// "/uploads/..." dentro del mensaje — se muestran como enlace al archivo.
+function TextoConEnlaces({ texto }: { texto: string }) {
+  const partes = texto.split(/(\/uploads\/\S+)/g);
+  return (
+    <>
+      {partes.map((p, i) =>
+        p.startsWith("/uploads/") ? (
+          <a key={i} href={`${URL_BASE_API}${p}`} target="_blank" rel="noopener noreferrer" className="text-brand-700 dark:text-brand-300 underline">
+            ver archivo
+          </a>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </>
+  );
 }
 
 function textoDistancia(metros: number): string {
@@ -588,7 +607,9 @@ function DetalleTicket({ id, tecnicos, onCerrar }: { id: number; tecnicos: Tecni
               </p>
             ) : (
               <div className={`max-w-[85%] rounded-sm px-3 py-2 text-sm ${m.autor === "USUARIO" ? "bg-brand-50 dark:bg-brand-900/40 text-gray-800 dark:text-gray-100" : "bg-stone-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100"}`}>
-                <p className="whitespace-pre-wrap break-words">{m.texto}</p>
+                <p className="whitespace-pre-wrap break-words">
+                  <TextoConEnlaces texto={m.texto} />
+                </p>
                 <p className="text-[10px] text-gray-400 mt-1">
                   {m.autor === "CLIENTE" ? "Cliente" : m.usuario?.nombre ?? "Usuario"} · {fechaHora(m.createdAt)}
                 </p>

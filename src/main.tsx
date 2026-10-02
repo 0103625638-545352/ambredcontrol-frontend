@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App.tsx'
 import { MarcacionPage } from './pages/MarcacionPage.tsx'
+import { PortalClientePage } from './pages/PortalClientePage.tsx'
 import { manejarCambioMayusculas } from './utils/mayusculasAutomaticas'
 import { registrarServiceWorker, guardarTokenParaServiceWorker } from './utils/serviceWorkerTecnico'
 
@@ -32,6 +33,9 @@ const queryClient = new QueryClient()
 // useQuery/useMutation con toda normalidad.
 const partesRuta = window.location.pathname.split('/').filter(Boolean)
 const esPantallaDeMarcacion = partesRuta[0] === 'marcar'
+// Mismo criterio para el portal del cliente (/portal/<empresaId>): público,
+// lo abren los clientes de internet desde su celular, sin cuenta de usuario.
+const esPortalCliente = partesRuta[0] === 'portal'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -42,7 +46,13 @@ createRoot(document.getElementById('root')!).render(
           del layout (no ocupa caja propia), es puramente un punto de
           enganche de eventos. */}
       <div onChangeCapture={manejarCambioMayusculas} className="contents">
-        {esPantallaDeMarcacion ? <MarcacionPage empresaIdInicial={partesRuta[1] ?? null} /> : <App />}
+        {esPortalCliente ? (
+          <PortalClientePage empresaIdInicial={partesRuta[1] ?? null} />
+        ) : esPantallaDeMarcacion ? (
+          <MarcacionPage empresaIdInicial={partesRuta[1] ?? null} />
+        ) : (
+          <App />
+        )}
       </div>
     </QueryClientProvider>
   </StrictMode>,
